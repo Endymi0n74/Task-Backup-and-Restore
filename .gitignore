@@ -1,0 +1,32 @@
+# --- Rust / build ---
+target/
+src-tauri/target/
+tsbak/target/
+
+# --- Node / Tauri ---
+node_modules/
+src-tauri/node_modules/
+
+# --- Journaux (données locales, jamais versionnées) ---
+dist/logs/
+*.log
+logs/
+
+# --- Données d'export réelles de la machine (à recréer via les scripts de démo) ---
+dist/guide/demo/assist-export/
+dist/guide/demo/export-demo/
+
+# --- Fichiers temporaires de capture / analyse ---
+dist/guide/shots/check*.png
+dist/guide/shots/_probe.png
+dist/guide/shots/viewer.html
+
+# --- Icône générée ---
+app-icon.png
+
+# --- Divers ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+.tmp/

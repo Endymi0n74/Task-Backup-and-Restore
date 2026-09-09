@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task backup and restore — Sauvegarde des tâches planifiées</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon">⏰</span>
+      <div>
+        <h1>Task backup and restore</h1>
+        <p>Sauvegarde des tâches planifiées Windows</p>
+      </div>
+    </div>
+    <div id="elevation-banner" class="elevation-banner hidden">
+      <span>Import non élevé : l'import s'exécutera via un processus administrateur temporaire (invite UAC à l'import, sans fermer l'interface).</span>
+    </div>
+    <div id="elevation-ok" class="elevation-ok hidden">✓ Droits administrateur</div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="tasks">Tâches &amp; Export</button>
+    <button class="tab" data-tab="import">Import</button>
+    <button class="tab" data-tab="logs">Logs</button>
+  </nav>
+
+  <main>
+    <!-- ================= Onglet Tâches & Export ================= -->
+    <section id="tab-tasks" class="tab-page active">
+      <div class="card">
+        <div class="toolbar">
+          <button id="btn-load-tasks" class="btn btn-primary">Charger les tâches</button>
+          <button id="btn-check-all" class="btn">Tout cocher</button>
+          <button id="btn-uncheck-all" class="btn">Tout décocher</button>
+          <span class="toolbar-gap"></span>
+          <label>Inclure (motifs) <input id="filter-include" type="text" placeholder="\Backup\*" /></label>
+          <label>Exclure (motifs) <input id="filter-exclude" type="text" placeholder="\Microsoft\*" /></label>
+        </div>
+        <div class="toolbar">
+          <span id="task-count" class="muted">Aucune tâche chargée.</span>
+          <span class="toolbar-gap"></span>
+          <label class="zip-option">Archive .zip <input id="zip-enabled" type="checkbox" /></label>
+          <input id="zip-name" class="zip-input" type="text" placeholder="export-tasks.zip" value="export-tasks.zip" />
+          <label class="zip-option">Chiffrer (AES-256) <input id="zip-encrypt" type="checkbox" /></label>
+          <input id="zip-password" class="zip-input" type="password" placeholder="Mot de passe de l'archive" disabled />
+          <button id="btn-export" class="btn btn-success">Exporter…</button>
+        </div>
+        <div class="table-wrap">
+          <table id="task-table">
+            <thead>
+              <tr>
+                <th class="col-check"></th>
+                <th>Tâche</th>
+                <th>Utilisateur</th>
+                <th>Connexion</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Onglet Import ================= -->
+    <section id="tab-import" class="tab-page">
+      <div class="card">
+        <div class="toolbar">
+          <button id="btn-pick-zip" class="btn">Choisir une archive .zip…</button>
+          <input id="zip-archive-password" class="zip-input" type="password" placeholder="Mot de passe du .zip (si chiffrée)" />
+          <span class="toolbar-sep">— ou —</span>
+        </div>
+        <div class="toolbar">
+          <label class="grow">Dossier d'archive
+            <input id="import-dir" type="text" placeholder="Chemin du dossier d'export (manifest.json)" />
+          </label>
+          <button id="btn-browse" class="btn">Parcourir…</button>
+          <button id="btn-extract-zip" class="btn">Extraire le .zip…</button>
+          <button id="btn-verify" class="btn">Vérifier l'archive</button>
+          <button id="btn-plan" class="btn btn-primary">Préparer le plan</button>
+        </div>
+        <div class="toolbar">
+          <label class="grow">Dossier cible du planificateur (optionnel)
+            <input id="import-folder" type="text" placeholder="\Restore-2026-09-09 — toutes les tâches seront restaurées sous ce dossier, structure d'origine préservée" />
+          </label>
+        </div>
+        <div id="manifest-summary" class="summary hidden"></div>
+      </div>
+
+      <div class="card hidden" id="plan-card">
+        <div class="card-title">
+          <h2>Plan d'import</h2>
+          <span id="plan-note" class="muted"></span>
+        </div>
+        <div class="table-wrap">
+          <table id="plan-table">
+            <thead>
+              <tr>
+                <th>Tâche (source)</th>
+                <th>Destination</th>
+                <th>Action</th>
+                <th>Utilisateur</th>
+                <th>Résolution</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="toolbar">
+          <span id="plan-count" class="muted"></span>
+          <span class="toolbar-gap"></span>
+          <button id="btn-replan" class="btn">Re-planifier</button>
+          <button id="btn-dryrun" class="btn btn-primary">Simuler (dry-run)</button>
+          <button id="btn-import" class="btn btn-success">Importer</button>
+          <button id="btn-clear-pw" class="btn">Effacer les mots de passe</button>
+        </div>
+      </div>
+
+      <div class="card hidden" id="report-card">
+        <div class="card-title"><h2>Rapport</h2></div>
+        <div id="report-content"></div>
+      </div>
+    </section>
+
+    <!-- ================= Onglet Logs ================= -->
+    <section id="tab-logs" class="tab-page">
+      <div class="card">
+        <div class="toolbar">
+          <span class="muted" id="log-dir-label"></span>
+          <span class="toolbar-gap"></span>
+          <button id="btn-open-logs" class="btn">Ouvrir le dossier des logs</button>
+        </div>
+        <pre id="log-view" class="log-view"></pre>
+      </div>
+    </section>
+  </main>
+
+  <footer id="statusbar" class="statusbar">Prêt.</footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
