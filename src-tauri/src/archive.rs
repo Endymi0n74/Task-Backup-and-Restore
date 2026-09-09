@@ -3,6 +3,10 @@
 //! (variante WinZip AES), et extraction inverse.
 //!
 //! Garanties :
+//! - **contenu restreint** : une archive produite ici ne contient QUE les XML
+//!   de tâches planifiées et le `manifest.json` — tout autre fichier présent
+//!   dans le dossier d'export (ancien `.zip`, journal, note…) est ignoré, à
+//!   la compression comme à l'extraction ;
 //! - le manifeste et les empreintes SHA-256 sont des fichiers comme les
 //!   autres dans l'archive : rien n'est recalculé, la vérification
 //!   d'intégrité de `tsbak` (`load_and_verify`) s'applique à l'identique
@@ -29,9 +33,19 @@ use zip::{AesMode, CompressionMethod, ZipWriter};
 
 use crate::app_log::AppLog;
 
+/// Noms admissibles dans une archive d'export : le `manifest.json` de la
+/// racine et les fichiers `.xml` de tâches (extension insensible à la casse).
+/// Tout le reste — anciennes archives, journaux, fichiers personnels — est
+/// ignoré, en écriture comme en lecture.
+fn is_export_entry(rel_name: &str) -> bool {
+    let lower = rel_name.to_lowercase();
+    lower == "manifest.json" || lower.ends_with(".xml")
+}
+
 /// Compresse `src_dir` vers `zip_path`. Si `password` est `Some`, l'archive
-/// est chiffrée en AES-256 ; sinon compression Deflate seule. Les fichiers
-/// et sous-dossiers sont stockés avec des chemins relatifs POSIX.
+/// est chiffrée en AES-256 ; sinon compression Deflate seule. Seuls les XML
+/// de tâches et `manifest.json` sont inclus ; les autres fichiers sont
+/// ignorés (comptabilisés et journalisés).
 pub fn zip_dir(
     log: &AppLog,
     src_dir: &Path,
@@ -53,13 +67,20 @@ pub fn zip_dir(
     };
 
     let mut count = 0usize;
-    collect_and_write(&mut writer, src_dir, Path::new(""), options, &mut count)?;
+    let mut ignored = 0usize;
+    collect_and_write(&mut writer, src_dir, Path::new(""), options, &mut count, &mut ignored)?;
     writer
         .finish()
         .map_err(|e| format!("clôture de l'archive : {e}"))?;
 
+    if ignored > 0 {
+        log.info(&format!(
+            "Archive ZIP : {} fichier(s) hors export (non-XML/manifeste) ignoré(s)",
+            ignored
+        ));
+    }
     log.info(&format!(
-        "Archive ZIP créée : {} fichier(s) vers {}",
+        "Archive ZIP créée : {} fichier(s) (XML de tâches + manifeste) vers {}",
         count,
         zip_path.display()
     ));
@@ -74,6 +95,7 @@ fn collect_and_write(
     rel_dir: &Path,
     options: FileOptions<'_, ()>,
     count: &mut usize,
+    ignored: &mut usize,
 ) -> Result<(), String> {
     let entries =
         fs::read_dir(fs_dir).map_err(|e| format!("lecture de {} : {e}", fs_dir.display()))?;
@@ -87,8 +109,8 @@ fn collect_and_write(
         let name = rel_dir.join(path.file_name().unwrap_or_default());
         let name_str = name.to_string_lossy().replace('\\', "/");
         if path.is_dir() {
-            collect_and_write(writer, &path, &name, options, count)?;
-        } else {
+            collect_and_write(writer, &path, &name, options, count, ignored)?;
+        } else if is_export_entry(&name_str) {
             writer
                 .start_file(name_str.as_str(), options)
                 .map_err(|e| format!("démarrage de l'entrée '{name_str}' : {e}"))?;
@@ -98,6 +120,10 @@ fn collect_and_write(
                 .write_all(&data)
                 .map_err(|e| format!("écriture de '{name_str}' : {e}"))?;
             *count += 1;
+        } else {
+            // Tout fichier qui n'est ni un XML de tâche ni le manifeste est
+            // volontairement exclu de l'archive.
+            *ignored += 1;
         }
     }
     Ok(())
@@ -106,6 +132,9 @@ fn collect_and_write(
 /// Extrait `zip_path` dans `dest_dir` après **validation** de l'archive
 /// extraite (manifeste + empreintes SHA-256). En cas d'échec de validation,
 /// l'extraction est annulée et `dest_dir` n'est pas créé.
+///
+/// Seuls les XML de tâches et le `manifest.json` sont extraits : toute autre
+/// entrée présente dans l'archive est ignorée (et journalisée).
 ///
 /// Si l'archive est chiffrée, `password` doit correspondre : l'erreur de
 /// mot de passe est signalée clairement. Retourne le nombre de fichiers
@@ -125,9 +154,18 @@ pub fn unzip_verified(
     let staging = temp_dir_for(dest_dir);
     let _ = fs::create_dir_all(&staging);
 
-    if let Err(e) = extract_all(zip_path, &staging, password) {
-        let _ = fs::remove_dir_all(&staging);
-        return Err(e);
+    let (extracted, ignored) = match extract_all(zip_path, &staging, password) {
+        Ok(counts) => counts,
+        Err(e) => {
+            let _ = fs::remove_dir_all(&staging);
+            return Err(e);
+        }
+    };
+    if ignored > 0 {
+        log.info(&format!(
+            "Archive ZIP : {} entrée(s) hors export (non-XML/manifeste) ignorée(s) à l'extraction",
+            ignored
+        ));
     }
 
     // Validation d'intégrité (manifeste + empreintes) avant de promouvoir
@@ -154,20 +192,30 @@ pub fn unzip_verified(
         .map(|d| d.flatten().count())
         .unwrap_or(0);
     log.info(&format!(
-        "Archive ZIP extraite et vérifiée vers {} ({} entrée(s) à la racine)",
+        "Archive ZIP extraite et vérifiée vers {} ({} fichier(s) XML/manifeste extraits, {} entrée(s) ignorée(s))",
         dest_dir.display(),
-        count
+        extracted,
+        ignored
     ));
     Ok(count)
 }
 
 /// Extrait toutes les entrées de `zip_path` vers `dest_dir`, avec protection
 /// zip-slip (`enclosed_name`) et gestion du chiffrement AES/ZipCrypto.
-fn extract_all(zip_path: &Path, dest_dir: &Path, password: Option<&str>) -> Result<(), String> {
+/// Seules les entrées d'export (XML + manifeste) sont écrites ; retourne
+/// `(extraites, ignorées)`.
+fn extract_all(
+    zip_path: &Path,
+    dest_dir: &Path,
+    password: Option<&str>,
+) -> Result<(usize, usize), String> {
     let file = fs::File::open(zip_path)
         .map_err(|e| format!("ouverture de {} : {e}", zip_path.display()))?;
     let mut archive =
         ZipArchive::new(file).map_err(|e| format!("lecture de l'archive ZIP : {e}"))?;
+
+    let mut extracted = 0usize;
+    let mut ignored = 0usize;
 
     for i in 0..archive.len() {
         let mut entry = if let Some(pw) = password {
@@ -202,10 +250,15 @@ fn extract_all(zip_path: &Path, dest_dir: &Path, password: Option<&str>) -> Resu
                 entry.name()
             ));
         };
-        let out_path = dest_dir.join(rel);
+        let rel_str = rel.to_string_lossy().replace('\\', "/");
+        let out_path = dest_dir.join(&rel);
         if entry.is_dir() {
             fs::create_dir_all(&out_path)
                 .map_err(|e| format!("création du dossier {} : {e}", out_path.display()))?;
+        } else if !is_export_entry(&rel_str) {
+            // Entrée étrangère (ancienne archive, journal, fichier personnel…) :
+            // ignorée volontairement, jamais écrite sur disque.
+            ignored += 1;
         } else {
             if let Some(parent) = out_path.parent() {
                 fs::create_dir_all(parent)
@@ -215,9 +268,10 @@ fn extract_all(zip_path: &Path, dest_dir: &Path, password: Option<&str>) -> Resu
                 .map_err(|e| format!("création de {} : {e}", out_path.display()))?;
             std::io::copy(&mut entry, &mut out)
                 .map_err(|e| format!("extraction de {} : {e}", out_path.display()))?;
+            extracted += 1;
         }
     }
-    Ok(())
+    Ok((extracted, ignored))
 }
 
 /// Dossier temporaire frère de la destination (même disque => rename atomique).
@@ -379,6 +433,77 @@ mod tests {
         );
         assert!(!out.path().join("evil.txt").exists());
     }
+
+    #[test]
+    fn zip_contains_only_task_xml_and_manifest() {
+        let log = test_log();
+        let src = tempfile::tempdir().unwrap();
+        sample_export(src.path());
+        // Fichiers étrangers dans le dossier d'export : ils ne doivent PAS
+        // entrer dans l'archive (anciennes archives, journaux, notes…).
+        fs::write(src.path().join("ancien-export.zip"), b"old zip").unwrap();
+        fs::write(src.path().join("export-2026-09-09.log"), b"log").unwrap();
+        fs::write(src.path().join("notes.txt"), b"notes").unwrap();
+        fs::write(src.path().join("schema.json"), b"{}").unwrap();
+        fs::create_dir_all(src.path().join("sous-dossier")).unwrap();
+        fs::write(src.path().join("sous-dossier").join("divers.bin"), b"x").unwrap();
+
+        let out = tempfile::tempdir().unwrap();
+        let zip_path = out.path().join("export.zip");
+        zip_dir(&log, src.path(), &zip_path, None).unwrap();
+
+        let file = fs::File::open(&zip_path).unwrap();
+        let mut archive = ZipArchive::new(file).unwrap();
+        let mut names: Vec<String> = (0..archive.len())
+            .map(|i| archive.by_index(i).unwrap().name().to_string())
+            .collect();
+        names.sort();
+        assert_eq!(
+            names,
+            vec!["Backup__Nightly.xml", "Backup__Weekly.xml", "manifest.json"],
+            "l'archive ne doit contenir que les XML de tâches et le manifeste"
+        );
+    }
+
+    #[test]
+    fn extraction_ignores_foreign_entries() {
+        let log = test_log();
+        let out = tempfile::tempdir().unwrap();
+
+        // Archive valide + une entrée étrangère (ancien journal) et un XML
+        // inconnu du manifeste (toléré à l'extraction, rejeté plus tard par
+        // la vérification d'intégrité uniquement s'il est référencé). Ici le
+        // XML étranger n'est pas référencé : il doit être ignoré à l'écriture.
+        let zip_path = out.path().join("mixed.zip");
+        {
+            let file = fs::File::create(&zip_path).unwrap();
+            let mut w = ZipWriter::new(file);
+            let opts = SimpleFileOptions::default();
+            let xml = "<Task>nightly</Task>";
+            w.start_file("Nightly.xml", opts).unwrap();
+            w.write_all(xml.as_bytes()).unwrap();
+            w.start_file("manifest.json", opts).unwrap();
+            w.write_all(
+                format!(
+                    r#"{{"version":1,"exported_at":"2026-09-08T12:00:00Z","source_host":"PC-TEST","tasks":[{{"path":"\\Nightly","xml_file":"Nightly.xml","sha256":"{h}","user_id":null,"logon_type":"None"}}]}}"#,
+                    h = tsbak::hash::sha256_hex(xml.as_bytes()),
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+            w.start_file("vieux-journal.log", opts).unwrap();
+            w.write_all(b"secret").unwrap();
+            w.start_file("Archive ancienne.zip", opts).unwrap();
+            w.write_all(b"PK").unwrap();
+            w.finish().unwrap();
+        }
+
+        let dest = out.path().join("extracted");
+        unzip_verified(&log, &zip_path, &dest, None).unwrap();
+        assert!(dest.join("Nightly.xml").exists());
+        assert!(dest.join("manifest.json").exists());
+        assert!(!dest.join("vieux-journal.log").exists(), "entrée étrangère non extraite");
+        assert!(!dest.join("Archive ancienne.zip").exists(), "entrée étrangère non extraite");    }
 
     #[test]
     fn subdirectories_are_preserved() {

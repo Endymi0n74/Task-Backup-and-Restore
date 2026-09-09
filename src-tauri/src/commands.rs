@@ -21,7 +21,7 @@ use tauri::State;
 use tsbak::answers::{AnswerFile, ConflictDecision};
 use tsbak::export::{export, PatternFilter};
 use tsbak::import::{build_plan, execute_plan, load_and_verify, ImportOptions, PlanItem};
-use tsbak::model::{ImportAction, Manifest};
+use tsbak::model::ImportAction;
 use tsbak::password::PasswordResolver;
 use tsbak::scheduler::TaskSchedulerApi;
 use tsbak::wizard::NullInteractor;
@@ -697,18 +697,6 @@ fn build_answers(decisions: &Option<ImportDecisions>) -> AnswerFile {
         }
     }
     answers
-}
-
-/// Résumé d'archive pour affichage (évite de re-sérialiser le manifeste brut).
-#[allow(dead_code)]
-fn manifest_summary(manifest: &Manifest) -> ManifestSummary {
-    ManifestSummary {
-        valid: true,
-        task_count: manifest.tasks.len(),
-        exported_at: Some(manifest.exported_at.clone()),
-        source_host: Some(manifest.source_host.clone()),
-        error: None,
-    }
 }
 
 // ---------------------------------------------------------------------------

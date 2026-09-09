@@ -70,9 +70,20 @@ async function initElevation() {
 
 let tasks = [];
 
+// Les tâches sous \Microsoft\ sont des tâches système : elles sont masquées
+// par défaut (case à cocher "Masquer les tâches Microsoft").
+const isMicrosoftTask = (path) => path.toLowerCase().startsWith("\\microsoft\\");
+
+function visibleTasks() {
+  return $("hide-microsoft").checked
+    ? tasks.filter((t) => !isMicrosoftTask(t.path))
+    : tasks;
+}
+
 function renderTasks() {
+  const rows = visibleTasks();
   const tbody = $("task-table").querySelector("tbody");
-  tbody.innerHTML = tasks
+  tbody.innerHTML = rows
     .map(
       (t) => `
       <tr>
@@ -83,15 +94,29 @@ function renderTasks() {
       </tr>`
     )
     .join("");
-  $("task-count").textContent = `${tasks.length} tâche(s) chargée(s).`;
+  const hidden = tasks.length - rows.length;
+  $("task-count").textContent =
+    hidden > 0
+      ? `${rows.length} tâche(s) affichée(s) — ${hidden} tâche(s) Microsoft masquée(s).`
+      : `${rows.length} tâche(s) affichée(s).`;
 }
+
+$("hide-microsoft").addEventListener("change", () => {
+  if (tasks.length > 0) renderTasks();
+});
 
 $("btn-load-tasks").addEventListener("click", async () => {
   setStatus("Chargement des tâches…");
   try {
     tasks = await invoke("list_tasks", { recursive: true });
     renderTasks();
-    setStatus(`${tasks.length} tâche(s) planifiée(s) trouvée(s).`, "success");
+    const hidden = tasks.filter((t) => isMicrosoftTask(t.path)).length;
+    setStatus(
+      hidden > 0
+        ? `${tasks.length} tâche(s) planifiée(s) trouvée(s) — ${hidden} tâche(s) Microsoft masquée(s) (décochez « Masquer les tâches Microsoft » pour les voir).`
+        : `${tasks.length} tâche(s) planifiée(s) trouvée(s).`,
+      "success"
+    );
   } catch (e) {
     showError(e);
   }

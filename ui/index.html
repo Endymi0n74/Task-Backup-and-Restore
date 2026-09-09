@@ -42,6 +42,9 @@
         <div class="toolbar">
           <span id="task-count" class="muted">Aucune tâche chargée.</span>
           <span class="toolbar-gap"></span>
+          <label class="zip-option" title="Les tâches sous \Microsoft\ sont des tâches système : elles restent accessibles via cette case, mais sont masquées par défaut.">
+            Masquer les tâches Microsoft <input id="hide-microsoft" type="checkbox" checked />
+          </label>
           <label class="zip-option">Archive .zip <input id="zip-enabled" type="checkbox" /></label>
           <input id="zip-name" class="zip-input" type="text" placeholder="export-tasks.zip" value="export-tasks.zip" />
           <label class="zip-option">Chiffrer (AES-256) <input id="zip-encrypt" type="checkbox" /></label>

@@ -21,6 +21,9 @@ dist/guide/shots/check*.png
 dist/guide/shots/_probe.png
 dist/guide/shots/viewer.html
 
+# --- Artefacts de release (à joindre aux releases GitHub, jamais commités) ---
+release/
+
 # --- Icône générée ---
 app-icon.png
 

@@ -121,11 +121,6 @@ pub fn run_helper_args(args: &[String]) -> i32 {
     code
 }
 
-/// Point d'entrée public appelé depuis `main.rs` quand `--helper-import` est présent.
-pub fn run_helper() -> i32 {
-    run_helper_args(&std::env::args().collect::<Vec<String>>())
-}
-
 /// Connecte le planificateur Windows (uniquement disponible sur Windows).
 fn make_scheduler() -> Result<Box<dyn TaskSchedulerApi>, String> {
     #[cfg(windows)]

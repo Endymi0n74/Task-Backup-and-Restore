@@ -1,6 +1,6 @@
 [package]
 name = "tsbak"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "Export/import des taches planifiees Windows (Task Scheduler) au format XML"
 license = "MIT"
