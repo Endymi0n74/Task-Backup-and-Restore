@@ -6,7 +6,7 @@ vérification d'intégrité et les mêmes journaux.
 
 - `TaskBackupRestore.exe` — interface graphique (Tauri 2), Windows 10/11 et Server 2016+.
 - `tsbak.exe` — ligne de commande, **Windows Server 2008 R2 → 2025+**, aucune dépendance runtime.
-- Guides et assistants inclus : voir [📖 Guide PDF](dist/Guide-tsbak.pdf) et `dist/*.cmd`.
+- Guides et assistants inclus : voir [📖 Guide PDF](dist/Guide-tsbak.pdf), [📋 MIGRATION.md](MIGRATION.md) (2008 R2 → 2022) et `dist/*.cmd`.
 
 ---
 
