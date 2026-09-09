@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 — 2026-09-10
+
+### Nouvelles fonctionnalités
+
+- **CLI : masquage des tâches Microsoft** : nouvelles options `--hide-microsoft`
+  sur `tsbak list` et `tsbak export` — les tâches système `\Microsoft\` sont
+  exclues, comme dans l'interface graphique (défaut : affichées/exportées).
+
 ## 1.0.0 — 2026-09-10
 
 Première version stable publiée.

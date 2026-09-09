@@ -25,6 +25,15 @@ impl PatternFilter {
         PatternFilter { include, exclude }
     }
 
+    /// Filtre "masquer les taches systeme" : exclut tout ce qui vit sous
+    /// `\Microsoft\` (dossier systeme), comme le fait l'interface graphique.
+    pub fn hide_microsoft() -> Self {
+        PatternFilter {
+            include: Vec::new(),
+            exclude: vec!["\\Microsoft\\*".to_string()],
+        }
+    }
+
     fn matches_one(pattern: &str, text: &str) -> bool {
         let pattern = pattern.to_lowercase();
         let text = text.to_lowercase();
@@ -65,6 +74,12 @@ impl PatternFilter {
         }
         true
     }
+}
+
+/// Indique si une tache vit sous le dossier systeme `\Microsoft\`
+/// (insensible a la casse). Utilise par `--hide-microsoft` (list/export).
+pub fn is_microsoft_task(path: &str) -> bool {
+    path.to_lowercase().starts_with("\\microsoft\\")
 }
 
 fn sanitize_filename(task_path: &str) -> String {
@@ -259,5 +274,31 @@ mod tests {
         assert!(PatternFilter::matches_one("*Weekly", "\\Backup\\Weekly"));
         assert!(!PatternFilter::matches_one("*Weekly", "\\Backup\\Nightly"));
         assert!(PatternFilter::matches_one("\\Backup\\Nightly", "\\Backup\\Nightly"));
+    }
+
+    #[test]
+    fn is_microsoft_task_detects_system_folder() {
+        assert!(is_microsoft_task("\\Microsoft\\Windows\\Defrag\\ScheduledDefrag"));
+        assert!(is_microsoft_task("\\microsoft\\Windows\\Update")); // insensible a la casse
+        assert!(!is_microsoft_task("\\MicrosoftEdge\\Update"));
+        assert!(!is_microsoft_task("\\MSIAfterburner"));
+        assert!(!is_microsoft_task("\\"));
+    }
+
+    #[test]
+    fn hide_microsoft_filter_excludes_system_tasks() {
+        let filter = PatternFilter::hide_microsoft();
+        assert!(!filter.allows("\\Microsoft\\Windows\\Defrag\\ScheduledDefrag"));
+        assert!(!filter.allows("\\Microsoft\\Office\\Feature Updates"));
+        assert!(filter.allows("\\MSIAfterburner"));
+        assert!(filter.allows("\\Backup\\Nightly"));
+    }
+
+    #[test]
+    fn hide_microsoft_filter_composes_with_include() {
+        let filter = PatternFilter::new(vec!["\\Backup\\*".to_string()], vec!["\\Microsoft\\*".to_string()]);
+        assert!(filter.allows("\\Backup\\Nightly"));
+        assert!(!filter.allows("\\Microsoft\\Windows\\Backup"));
+        assert!(!filter.allows("\\Other\\Task"));
     }
 }

@@ -6,7 +6,7 @@ use clap::Parser;
 
 use tsbak::answers::{parse_user_map, AnswerFile};
 use tsbak::error::{Result, TsbakError};
-use tsbak::export::{export, PatternFilter};
+use tsbak::export::{export, is_microsoft_task, PatternFilter};
 use tsbak::import::{build_plan, execute_plan, load_and_verify, ImportOptions};
 use tsbak::model::ExecutionReport;
 use tsbak::password::{load_password_file, PasswordResolver};
@@ -85,18 +85,39 @@ fn run() -> Result<i32> {
         local_host_name()
     ));
     match cli.command {
-        Command::List { recursive } => {
+        Command::List { recursive, hide_microsoft } => {
             let scheduler = make_scheduler()?;
             let tasks = scheduler.list_tasks(recursive)?;
+            let mut shown = 0usize;
             for t in &tasks {
+                if hide_microsoft && is_microsoft_task(&t.path) {
+                    continue;
+                }
                 println!("{}", t.path);
+                shown += 1;
             }
-            println!("{} tache(s).", tasks.len());
+            if hide_microsoft {
+                let hidden = tasks.len() - shown;
+                println!("{} tache(s) affichee(s) ({} Microsoft masquee(s)).", shown, hidden);
+            } else {
+                println!("{} tache(s).", tasks.len());
+            }
             Ok(0)
         }
 
-        Command::Export { dir, include, exclude } => {
+        Command::Export {
+            dir,
+            include,
+            exclude,
+            hide_microsoft,
+        } => {
             let scheduler = make_scheduler()?;
+            // Les taches systeme sont exclues de la meme facon que dans
+            // l'interface (dossier \Microsoft\ entierement ignore).
+            let mut exclude = exclude;
+            if hide_microsoft {
+                exclude.push("\\Microsoft\\*".to_string());
+            }
             let filter = PatternFilter::new(include, exclude);
             tsbak::log::info(format!("Export vers {}", dir.display()));
             let summary = export(scheduler.as_ref(), &dir, true, &filter, &local_host_name())?;

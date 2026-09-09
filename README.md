@@ -15,7 +15,8 @@ vérification d'intégrité et les mêmes journaux.
 - **Export** : liste des tâches planifiées, sélection par cases à cocher, filtres
   d'inclusion/exclusion (motifs simples `*`), export vers un dossier (XML + `manifest.json`).
   Les tâches système `\Microsoft\` sont **masquées par défaut** dans l'interface (une case à
-  cocher permet de les afficher) — elles restent exportables si vous les affichez.
+  cocher permet de les afficher) — elles restent exportables si vous les affichez. En CLI,
+  `tsbak list --hide-microsoft` et `tsbak export --hide-microsoft` les excluent.
 - **Archive `.zip` optionnelle**, **chiffrable AES-256** (variante WinZip AES, lisible par
   7-Zip/WinZip). L'archive ne contient **que** les XML de tâches et le `manifest.json` :
   tout autre fichier présent dans le dossier d'export (ancien `.zip`, journal, notes…) est
@@ -79,6 +80,9 @@ Ses sources sont dans [`dist/guide/`](dist/guide/) (HTML + captures + scripts de
 ```bat
 :: 1. Exporter toutes les tâches vers un dossier
 tsbak.exe export C:\tsbak\export-2026-01-01
+
+::    ... ou sans les tâches système \Microsoft\
+tsbak.exe export C:\tsbak\export-2026-01-01 --hide-microsoft
 
 :: 2. Vérifier l'intégrité (manifeste + empreintes SHA-256)
 tsbak.exe validate C:\tsbak\export-2026-01-01

@@ -24,6 +24,10 @@ pub enum Command {
         /// Parcourt aussi les sous-dossiers.
         #[arg(long)]
         recursive: bool,
+
+        /// Masque les taches systeme \Microsoft\ (comme l'interface).
+        #[arg(long)]
+        hide_microsoft: bool,
     },
 
     /// Exporte les taches planifiees vers un dossier (XML brut + manifest.json).
@@ -38,6 +42,10 @@ pub enum Command {
         /// Motif d'exclusion (glob simple avec '*'), repetable.
         #[arg(long = "exclude")]
         exclude: Vec<String>,
+
+        /// Masque les taches systeme \Microsoft\ (comme l'interface).
+        #[arg(long)]
+        hide_microsoft: bool,
     },
 
     /// Reimporte les taches depuis un dossier d'export.

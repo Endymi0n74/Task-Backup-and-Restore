@@ -126,6 +126,26 @@ dossier de journaux (utilise par les tests).
   Windows 7/Server 2008 R2 et 2012 (fige en version 109, non patchee depuis
   octobre 2023).
 
+## Ligne de commande
+
+```bash
+# Liste des taches (recursif)
+tsbak.exe list --recursive
+
+# Liste sans les taches systeme \Microsoft\
+tsbak.exe list --hide-microsoft
+
+# Export de toutes les taches
+tsbak.exe export C:\tsbak\export-2026-01-01
+
+# Export sans les taches systeme \Microsoft\ (comme l'interface)
+tsbak.exe export C:\tsbak\export-2026-01-01 --hide-microsoft
+
+# Export avec motifs d'inclusion/exclusion
+# (--hide-microsoft equivaut a ajouter --exclude "\Microsoft\*")
+tsbak.exe export C:\tsbak\export-2026-01-01 --include "\Backup\*" --exclude "\Microsoft\*"
+```
+
 ## Import pas a pas (CLI)
 
 Sur la machine cible, en **administrateur** (clic droit > Executer en tant
