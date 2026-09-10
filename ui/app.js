@@ -215,6 +215,9 @@ const decisions = {
   skipTasks: [], // chemins (sérialisé depuis un Set)
 };
 const skipSet = new Set();
+// Champs « mot de passe requis » par tâche (chemin -> input), remplis en bloc
+// par le bouton « Remplir avec le même mot de passe ».
+const passwordInputs = new Map();
 let manifestInfo = null;
 
 // Cache d'extraction automatique des .zip : { raw, dir }.
@@ -385,6 +388,7 @@ function actionBadge(item) {
 function renderPlan() {
   const tbody = $("plan-table").querySelector("tbody");
   tbody.innerHTML = "";
+  passwordInputs.clear();
   let pending = 0;
 
   const folder = targetFolderValue();
@@ -422,6 +426,7 @@ function renderPlan() {
     ? `Restauration sous « ${folder} » (structure d'origine préservée). Résolvez chaque tâche puis « Re-planifier » pour actualiser le plan.`
     : "Résolvez chaque tâche puis « Re-planifier » pour actualiser le plan.";
   $("plan-count").textContent = `${plan.length} tâche(s) — ${pending} à résoudre.`;
+  $("btn-fill-same-password").disabled = !plan.some((i) => i.actionKind === "password_required");
 }
 
 function td(html) {
@@ -482,16 +487,16 @@ function buildResolutionControls(item) {
       const input = document.createElement("input");
       input.type = "text";
       input.placeholder = `Compte cible pour ${item.sourceUser}`;
-      const mapped = decisions.userMap[item.source_user];
+      const mapped = decisions.userMap[item.sourceUser];
       if (mapped) input.value = mapped;
       input.addEventListener("change", () => {
         const v = input.value.trim();
         if (v) {
-          decisions.userMap[item.source_user] = v;
-          setStatus(`« ${item.source_user} » mappé vers « ${v} ».`);
+          decisions.userMap[item.sourceUser] = v;
+          setStatus(`« ${item.sourceUser} » mappé vers « ${v} ».`);
         } else {
-          delete decisions.userMap[item.source_user];
-          setStatus(`Mapping retiré pour « ${item.source_user} ».`);
+          delete decisions.userMap[item.sourceUser];
+          setStatus(`Mapping retiré pour « ${item.sourceUser} ».`);
         }
       });
       wrap.appendChild(input);
@@ -502,6 +507,7 @@ function buildResolutionControls(item) {
       const input = document.createElement("input");
       input.type = "password";
       input.placeholder = `Mot de passe pour ${item.targetUser}`;
+      passwordInputs.set(item.path, input);
       input.addEventListener("change", async () => {
         try {
           await invoke("import_set_password", { user: item.targetUser, password: input.value });
@@ -609,6 +615,34 @@ function renderReport(report, dryRun) {
   exit.className = "report-line " + (code === 0 ? "report-ok" : "report-err");
   box.appendChild(exit);
 }
+
+$("btn-fill-same-password").addEventListener("click", async () => {
+  const password = $("import-same-password").value;
+  if (!password) {
+    setStatus("Saisissez d'abord le mot de passe à appliquer.", "error");
+    return;
+  }
+  const targets = plan.filter((i) => i.actionKind === "password_required" && i.targetUser);
+  if (targets.length === 0) {
+    setStatus("Aucune tâche ne requiert de mot de passe dans ce plan.", "error");
+    return;
+  }
+  try {
+    for (const item of targets) {
+      // Même commande que la saisie ligne par ligne : le secret ne quitte
+      // jamais le processus Rust (stocké en mémoire, jamais journalisé).
+      await invoke("import_set_password", { user: item.targetUser, password });
+      const input = passwordInputs.get(item.path);
+      if (input) input.value = password;
+    }
+    setStatus(
+      `Mot de passe appliqué à ${targets.length} tâche(s). « Re-planifier » puis Simuler / Importer.`,
+      "success"
+    );
+  } catch (e) {
+    showError(e);
+  }
+});
 
 $("btn-clear-pw").addEventListener("click", async () => {
   try {

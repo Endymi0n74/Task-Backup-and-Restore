@@ -1,5 +1,15 @@
 # Changelog
 
+## Non publié
+
+### Nouvelles fonctionnalités
+
+- **Import : mot de passe unique pour toutes les tâches** : dans le plan d'import,
+  un champ masqué « Mot de passe unique » + bouton « Remplir avec le même mot de
+  passe » applique un seul mot de passe à toutes les tâches « Mot de passe requis »
+  (même commande `import_set_password` que la saisie ligne par ligne — le secret ne
+  quitte jamais le processus Rust, jamais journalisé).
+
 ## 1.1.0 — 2026-09-10
 
 ### Nouvelles fonctionnalités
