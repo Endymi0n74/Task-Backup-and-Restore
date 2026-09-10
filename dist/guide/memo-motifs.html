@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Mémo — Motifs d'inclusion / exclusion (tsbak)</title>
+<style>
+  :root {
+    --primary: #1e5aa8;
+    --primary-dark: #143d73;
+    --accent: #2f9e44;
+    --border: #d9dee8;
+    --bg: #f6f8fb;
+    --text: #1f2937;
+    --muted: #5b6675;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, Arial, sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text);
+    background: #fff;
+  }
+  @page { size: A4; margin: 12mm; }
+
+  .band {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    border-radius: 10px;
+    padding: 16px 20px 13px;
+    margin-bottom: 14px;
+  }
+  .band h1 { margin: 0 0 3px; font-size: 20px; letter-spacing: .3px; }
+  .band p { margin: 0; font-size: 12.5px; opacity: .92; }
+
+  h2 {
+    font-size: 14.5px; color: var(--primary-dark);
+    border-bottom: 2px solid var(--primary); padding-bottom: 3px;
+    margin: 16px 0 8px; page-break-after: avoid;
+  }
+  p { margin: 5px 0; }
+  code {
+    font-family: Consolas, "Cascadia Mono", monospace;
+    background: #eef1f6; border-radius: 4px; padding: 0 4px; font-size: 11px;
+  }
+  table.tbl { border-collapse: collapse; width: 100%; font-size: 11.5px; margin: 6px 0; }
+  table.tbl th, table.tbl td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; vertical-align: top; }
+  table.tbl th { background: #eef2f8; }
+  table.tbl code { white-space: nowrap; }
+
+  .callout { border-radius: 8px; padding: 8px 11px; margin: 8px 0; font-size: 11.5px; page-break-inside: avoid; }
+  .callout.tip { background: #f0faf1; border: 1px solid #bfe3c4; }
+  .callout.warn { background: #fff8ec; border: 1px solid #f2d9a8; }
+  .callout strong { font-size: 11.5px; }
+  .callout.tip strong { color: #1b7a33; }
+  .callout.warn strong { color: #9a5b00; }
+
+  pre {
+    background: #0f172a; color: #d5e2f5; border-radius: 8px;
+    padding: 9px 11px; font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 11px; line-height: 1.5; white-space: pre-wrap;
+    page-break-inside: avoid; margin: 7px 0;
+  }
+  pre .c { color: #7c8aa5; }
+
+  .footer-note { margin-top: 14px; padding-top: 7px; border-top: 1px solid var(--border); font-size: 10.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="band">
+  <h1>Mémo — Motifs d'inclusion / exclusion</h1>
+  <p>Sélection des tâches planifiées dans <strong>tsbak</strong> (interface et ligne de commande) — version 1.1.0</p>
+</div>
+
+<h2>1. Règle d'or</h2>
+<p>Les motifs s'appliquent au <strong>chemin complet de la tâche</strong> dans le Planificateur (ex. <code>\Backup\Nightly</code>),
+jamais au nom du fichier XML. Un seul caractère joker : <code>*</code> (n'importe quelle suite de caractères). Comparaison
+<strong>insensible à la casse</strong>. Plusieurs motifs peuvent être donnés (séparés par des virgules ou retours à la ligne
+dans l'interface ; option répétable <code>--include</code>/<code>--exclude</code> en CLI) : il suffit d'en correspondre à un seul.</p>
+
+<div class="callout warn">
+  <strong>Ordre d'application :</strong> ① les <strong>inclusions</strong> définissent d'abord les candidates (sans
+  <code>--include</code>, toutes les tâches sont candidates) ; ② les <strong>exclusions</strong> retirent ensuite toute
+  candidate qui correspond ; ③ dans l'interface, les <strong>cases à cocher</strong> jouent le rôle d'inclusions et
+  « Masquer les tâches Microsoft » agit en amont sur l'affichage.
+</div>
+
+<h2>2. Correspondance des motifs</h2>
+<table class="tbl">
+  <tr><th>Motif</th><th>Correspond à</th><th>Ne correspond pas</th></tr>
+  <tr><td><code>\Backup\*</code></td><td><code>\Backup\Nightly</code>, <code>\Backup\Weekly</code>, <code>\Backup\Nouveau\Truc</code></td><td><code>\Backup</code> exact, <code>\Other\Task</code></td></tr>
+  <tr><td><code>*Weekly</code></td><td><code>\Backup\Weekly</code>, <code>\A\B\Weekly</code></td><td><code>\Backup\Nightly</code></td></tr>
+  <tr><td><code>\Microsoft\*</code></td><td>toutes les tâches sous <code>\Microsoft\</code></td><td>tout ce qui n'est pas sous <code>\Microsoft\</code></td></tr>
+  <tr><td><code>\MSIAfterburner</code></td><td>la tâche racine nommée exactement</td><td><code>\MSIAfterburner\Sous</code></td></tr>
+  <tr><td><code>\Backup\Nightly</code></td><td>ce chemin exact uniquement</td><td><code>\Backup\NightlyV2</code></td></tr>
+  <tr><td><code>\Backup\*\.xml *</code> n/a</td><td colspan="2">— le joker peut être au milieu : <code>\Backup\*\Nettoyage</code> correspond à <code>\Backup\Semaine\Nettoyage</code> mais pas à <code>\Backup\Nettoyage</code></td></tr>
+</table>
+
+<h2>3. Cas courants</h2>
+<table class="tbl">
+  <tr><th>Objectif</th><th>À saisir</th></tr>
+  <tr><td>Exporter tout sauf les tâches système Windows</td><td><code>--exclude "\Microsoft\*"</code> &nbsp;(<code>--hide-microsoft</code> en raccourci)</td></tr>
+  <tr><td>Exporter uniquement un dossier (et ses sous-dossiers)</td><td><code>--include "\Backup\*"</code></td></tr>
+  <tr><td>Exporter deux dossiers précis</td><td><code>--include "\Backup\*" --include "\Maintenance\*"</code></td></tr>
+  <tr><td>Exporter un dossier sauf une sous-partie</td><td><code>--include "\Backup\*" --exclude "\Backup\Ancien\*"</code></td></tr>
+  <tr><td>Exporter une seule tâche</td><td><code>--include "\Backup\Nightly"</code></td></tr>
+  <tr><td>Exclure par nom de tâche (tous dossiers)</td><td><code>--exclude "*Test*"</code></td></tr>
+  <tr><td>Interface : inclure + exclure</td><td>remplir <em>Inclure (motifs)</em> puis <em>Exclure (motifs)</em>, séparés par des virgules</td></tr>
+</table>
+
+<h2>4. Exemples CLI</h2>
+<pre><span class="c">:: tout sauf les tâches systeme \Microsoft\</span>
+tsbak.exe export D:\export --hide-microsoft
+
+<span class="c">:: uniquement le dossier \Backup\ , sans sa sous-partie \Backup\Ancien\</span>
+tsbak.exe export D:\export --include "\Backup\*" --exclude "\Backup\Ancien\*"
+
+<span class="c">:: deux dossiers + exclusion systeme explicite (equivalente a --hide-microsoft)</span>
+tsbak.exe export D:\export --include "\Backup\*" --include "\Maintenance\*" --exclude "\Microsoft\*"
+
+<span class="c">:: reperage : lister le resultat des filtres sans rien exporter (voir le compteur)</span>
+tsbak.exe list --recursive --hide-microsoft</pre>
+
+<div class="callout tip">
+  <strong>Vérifier avant d'exporter :</strong> le rapport d'export affiche « N tâche(s) exportée(s) … M ignorée(s) par les
+  filtres ». Si le compte ne correspond pas à l'attendu, la cause est presque toujours un motif trop large
+  (<code>\Backup</code> au lieu de <code>\Backup\*</code>) ou trop étroit (joker manquant en fin de motif).
+</div>
+
+<div class="footer-note">
+  tsbak v1.1.0 — Mémo des filtres d'export. Détail complet dans le <strong>Guide d'utilisation</strong>
+  (<code>dist\Guide-tsbak.pdf</code>, section 3) et <code>MIGRATION.md</code>.
+</div>
+
+</body>
+</html>

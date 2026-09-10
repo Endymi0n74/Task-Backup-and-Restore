@@ -9,7 +9,7 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
 - **Chemin** : `D:\Codex\tsbak-gui` (dépôt Git autonome, branche `master`).
 - **Deux interfaces, un moteur** : `tsbak` (crate Rust + CLI) et `TaskBackupRestore.exe`
   (Tauri 2). Livraison portable dans `dist/`.
-- **Dernière version** : 1.0.0 (2026-09-10).
+- **Dernière version** : 1.1.0 (option `--hide-microsoft` du CLI, 2026-09-10).
 
 ## Dates clés
 
@@ -20,6 +20,10 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
   assistants `.cmd`).
 - **2026-09-09/10** — v1.0.0 : archives `.zip` restreintes (XML + manifeste uniquement),
   tâches Microsoft masquées par défaut, nettoyage de code, version unifiée.
+- **2026-09-10** — v1.1.0 : option CLI `--hide-microsoft` (list/export) ; `MIGRATION.md`
+  (procédure 2008 R2 → 2022) ; section dédiée « filtres Inclure/Exclure » dans le guide
+  (section 3) ; mémo d'une page `dist/Memo-motifs.pdf` ; script `make-pdf.ps1`
+  (Edge headless) régénère les PDF depuis les sources HTML modifiables.
 
 ## Décisions structurantes
 

@@ -6,7 +6,7 @@ vérification d'intégrité et les mêmes journaux.
 
 - `TaskBackupRestore.exe` — interface graphique (Tauri 2), Windows 10/11 et Server 2016+.
 - `tsbak.exe` — ligne de commande, **Windows Server 2008 R2 → 2025+**, aucune dépendance runtime.
-- Guides et assistants inclus : voir [📖 Guide PDF](dist/Guide-tsbak.pdf), [📋 MIGRATION.md](MIGRATION.md) (2008 R2 → 2022) et `dist/*.cmd`.
+- Guides et assistants inclus : voir [📖 Guide PDF](dist/Guide-tsbak.pdf), [📄 Mémo filtres (PDF)](dist/Memo-motifs.pdf), [📋 MIGRATION.md](MIGRATION.md) (2008 R2 → 2022) et `dist/*.cmd`.
 
 ---
 
@@ -58,7 +58,17 @@ Le guide illustré complet est inclus : **[`dist/Guide-tsbak.pdf`](dist/Guide-ts
 - options avancées (`--folder`, `--user-map`, `--password-file`, import non interactif) ;
 - sécurité, bonnes pratiques et dépannage.
 
-Ses sources sont dans [`dist/guide/`](dist/guide/) (HTML + captures + scripts de capture).
+Ses sources sont dans [`dist/guide/`](dist/guide/) (HTML + captures + scripts de capture). Un **mémo d'une page** sur les
+filtres d'inclusion/exclusion est aussi disponible : [`dist/Memo-motifs.pdf`](dist/Memo-motifs.pdf) (source : `dist/guide/memo-motifs.html`).
+
+Pour régénérer les PDF depuis leurs sources HTML (Edge headless, aucune installation) :
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File dist/guide/scripts/make-pdf.ps1 `
+    -Html dist/guide/guide.html -Pdf dist/Guide-tsbak.pdf
+powershell -NoProfile -ExecutionPolicy Bypass -File dist/guide/scripts/make-pdf.ps1 `
+    -Html dist/guide/memo-motifs.html -Pdf dist/Memo-motifs.pdf
+```
 
 ## Démarrage rapide
 
