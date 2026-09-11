@@ -54,7 +54,7 @@ fonctionne sans élévation.
 
 3. **Choisir ce qu'on migre** : en général on **n'importe pas** les tâches
    système `\Microsoft\` (elles sont recréées par Windows) ni celles des
-   produits qu'on abandonne. `--hide-microsoft` (v1.1.0+) les exclut d'un
+   produits qu'on abandonne. `--hide-microsoft` (v1.0.0+) les exclut d'un
    coup ; sinon `--include` / `--exclude` permettent une sélection fine.
 
 ---

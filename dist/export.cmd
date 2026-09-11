@@ -36,7 +36,7 @@ if "%CODE%"=="0" (
   echo.
   echo OK. Archive pret a etre copiee / importee ailleurs.
 ) else (
-  echo ECHEC de l'export (code %CODE%). Detail dans "%LOG%".
+  echo ECHEC de l'export ^(code %CODE%^). Detail dans "%LOG%".
 )
 pause
 endlocal

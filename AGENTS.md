@@ -26,6 +26,9 @@ cd src-tauri && cargo test && cargo build --release
 
 # Test de bout en bout réel (Windows + COM, ignoré par défaut)
 cd src-tauri && cargo test e2e_export_zip_aes_then_reimport -- --ignored --nocapture
+
+# Artefacts de release (dossier + .zip dans release/, non versionné)
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-release.ps1
 ```
 
 ## Conventions

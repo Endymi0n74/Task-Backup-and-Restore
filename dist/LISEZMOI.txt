@@ -15,7 +15,10 @@ CONTENU DU DOSSIER
     d'ecran + explications pas a pas) couvrant l'interface
     graphique, la ligne de commande et les assistants .cmd
     (section dediee aux serveurs 2008 R2 / 2012).
-  - guide\        : sources du guide (HTML + captures).
+  - Memo-motifs.pdf : memo d'une page sur les filtres
+    d'inclusion/exclusion (motifs simples *).
+  - guide\        : sources du guide (HTML + captures + scripts de
+    demonstration).
   - tsbak.exe     : version ligne de commande (TOUTES les
     versions de Windows Server de 2008 R2 a 2025). Meme
     moteur, journaux inclus.

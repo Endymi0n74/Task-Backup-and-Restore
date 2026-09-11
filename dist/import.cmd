@@ -48,7 +48,7 @@ echo.
 if "%CODE%"=="0" (
   echo IMPORT TERMINE SANS ERREUR.
 ) else (
-  echo ATTENTION : l'import s'est termine avec le code %CODE% (voir rapport ci-dessus).
+  echo ATTENTION : l'import s'est termine avec le code %CODE% ^(voir rapport ci-dessus^).
 )
 echo Journal : "%LOG%"
 pause

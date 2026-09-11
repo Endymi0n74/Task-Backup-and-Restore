@@ -20,6 +20,8 @@ dist/guide/demo/export-demo/
 dist/guide/shots/check*.png
 dist/guide/shots/_probe.png
 dist/guide/shots/viewer.html
+dist/guide/tmp-*
+dist/guide/_inspect.html
 
 # --- Artefacts de release (à joindre aux releases GitHub, jamais commités) ---
 release/

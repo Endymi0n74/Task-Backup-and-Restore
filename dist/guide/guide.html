@@ -334,6 +334,7 @@
   <li>Cliquer <strong>« Vérifier l'archive »</strong> : intégrité contrôlée (manifeste présent, empreintes SHA-256 conformes, XML bien formés). Un résumé vert s'affiche : <em>« Archive valide : N tâche(s), source 'MACHINE' »</em>.</li>
   <li>(Optionnel) renseigner un <strong>dossier cible du planificateur</strong>, ex. <code>\Restauration-2026-09-09</code> : chaque tâche est restaurée sous ce dossier, sa structure d'origine étant préservée (<code>\Dossier\Tâche</code> → <code>\Restauration-2026-09-09\Dossier\Tâche</code>).</li>
   <li>Cliquer <strong>« Préparer le plan »</strong> : chaque tâche est analysée et classée — <span class="badge b-green">Créer</span> <span class="badge b-blue">Mettre à jour</span> <span class="badge b-gray">Ignorer</span> <span class="badge b-orange">Conflit</span> <span class="badge b-purple">Utilisateur non mappé</span> <span class="badge b-red">Mot de passe requis</span>. Les lignes à résoudre proposent le mapping d'utilisateur et le mot de passe (champ masqué).</li>
+  <li><strong>Résoudre les mots de passe</strong> : les lignes <span class="badge b-red">Mot de passe requis</span> attendent le mot de passe du compte — soit ligne par ligne, soit d'un seul geste avec le champ <strong>« Mot de passe unique »</strong> (voir 4.1). Cliquer ensuite <strong>« Re-planifier »</strong> pour actualiser le plan.</li>
   <li><strong>« Simuler (dry-run) »</strong> pour vérifier le rapport sans rien écrire, puis <strong>« Importer »</strong> pour appliquer réellement.</li>
   <li>Si l'application n'est pas lancée en administrateur, une <strong>invite UAC</strong> apparaît : l'import s'exécute dans un processus administrateur temporaire, <strong>l'interface reste ouverte</strong> et affiche le rapport à la fin.</li>
   <li>Le <strong>rapport</strong> détaille : créées, mises à jour, ignorées, bloquées, échecs. Tout est journalisé (onglet Logs).</li>
@@ -358,6 +359,36 @@
   <strong>Élévation :</strong> l'import réel écrit dans le Planificateur — il s'exécute via une invite UAC si nécessaire. La <strong>simulation</strong> ne nécessite aucune élévation. Sur un compte administrateur, aucune invite n'apparaît.
 </div>
 
+<h3>4.1. Appliquer un mot de passe unique à toutes les tâches</h3>
+
+<p>Certaines tâches utilisent le type de connexion <strong>« Mot de passe »</strong> : Windows exige alors le mot de passe du compte pour les enregistrer. Après « Préparer le plan », ces tâches portent le badge <span class="badge b-red">Mot de passe requis</span> et proposent un champ masqué <em>« Mot de passe pour &lt;utilisateur&gt; »</em>, à remplir ligne par ligne. Quand plusieurs tâches sont dans ce cas (restauration d'un serveur entier, par exemple), le plan offre aussi un <strong>mot de passe unique</strong>.</p>
+
+<ol class="steps">
+  <li>Saisir le mot de passe dans le champ <strong>« Mot de passe unique »</strong>, au-dessus du tableau du plan (saisie masquée).</li>
+  <li>Cliquer <strong>« Remplir avec le même mot de passe »</strong> : le secret est appliqué à <strong>toutes</strong> les lignes « Mot de passe requis », le champ de chaque ligne est rempli et la barre d'état confirme <em>« Mot de passe appliqué à N tâche(s) »</em>.</li>
+  <li>Cliquer <strong>« Re-planifier »</strong> : les lignes concernées passent de « Mot de passe requis » à <span class="badge b-green">Créer</span> ou <span class="badge b-blue">Mettre à jour</span>, et le compteur « tâche(s) à résoudre » diminue.</li>
+  <li><strong>« Simuler (dry-run) »</strong> puis <strong>« Importer »</strong>. Le bouton <strong>« Effacer les mots de passe »</strong> vide tous les mots de passe du plan (utile avant de quitter la machine).</li>
+</ol>
+
+<figure>
+  <div class="shot">
+    <img src="shots/10-import-password.png" alt="Plan d'import : champ Mot de passe unique et ligne Mot de passe requis" />
+    <span class="mark blue" style="left:9.6%; top:58.7%">1</span>
+    <span class="mark blue" style="left:28.7%; top:57.5%">2</span>
+    <span class="mark warn" style="left:51.5%; top:69.6%">3</span>
+    <span class="mark green" style="left:76.4%; top:69.7%">4</span>
+  </div>
+  <figcaption>
+    <strong>Figure 4 — Mot de passe unique.</strong> ① Champ <em>Mot de passe unique</em> · ② « Remplir avec le même mot de passe » (actif dès que le plan contient une telle ligne) ·
+    ③ Ligne <span class="badge b-red">Mot de passe requis</span> (ici une tâche planifiée enregistrée sous un compte de la machine source) ·
+    ④ Champ par ligne : rempli automatiquement par le bouton — la saisie ligne par ligne reste possible.
+  </figcaption>
+</figure>
+
+<div class="callout info">
+  <strong>Sécurité :</strong> le mot de passe unique emprunte exactement le <strong>même chemin</strong> que la saisie ligne par ligne (commande <code>import_set_password</code>) : le secret reste en <strong>mémoire du processus Rust</strong>, n'est <strong>jamais journalisé</strong> ni écrit sur disque, et n'est transmis au processus d'import élevé que par le fichier temporaire d'élévation, supprimé ensuite. Le bouton « Remplir avec le même mot de passe » n'est actif que si la ligne correspondante existe dans le plan. En ligne de commande, l'équivalent est <code>--password-file mdp.txt</code> (un mot de passe par utilisateur).
+</div>
+
 <!-- ================= 4. LOGS ================= -->
 <h2 class="section">5. Consulter les journaux (onglet Logs)</h2>
 
@@ -368,7 +399,7 @@
     <img src="shots/03-logs.png" alt="Onglet Logs : journal en temps réel" />
     <span class="mark blue" style="left:50%; top:50%">1</span>
   </div>
-  <figcaption><strong>Figure 4 — Logs.</strong> ① Journal du jour : démarrage, chargement des tâches, puis chaque opération d'export/import.</figcaption>
+  <figcaption><strong>Figure 5 — Logs.</strong> ① Journal du jour : démarrage, chargement des tâches, puis chaque opération d'export/import.</figcaption>
 </figure>
 
 <div class="callout info">
@@ -413,7 +444,7 @@ Les motifs utilisent * (insensible à la casse).
     <img src="shots/04-cli-export.png" alt="Console : export en ligne de commande" />
     <span class="mark blue" style="left:10%; top:21%">1</span>
   </div>
-  <figcaption><strong>Figure 5 — Export CLI.</strong> ① « 1 tâche exportée », les 167 autres étant ignorées par le filtre — le dossier contient le XML + manifest.json.</figcaption>
+  <figcaption><strong>Figure 6 — Export CLI.</strong> ① « 1 tâche exportée », les 167 autres étant ignorées par le filtre — le dossier contient le XML + manifest.json.</figcaption>
 </figure>
 
 <h3>6.2. Valider puis importer</h3>
@@ -433,7 +464,7 @@ tsbak.exe import D:\sauvegardes\export-2026-09-09</code></pre>
     <span class="mark warn" style="left:16%; top:62%">2</span>
   </div>
   <figcaption>
-    <strong>Figure 6 — Import CLI.</strong> ① « Archive valide : 1 tâche(s), source 'KEYRA-PC' » · ② Simulation : la tâche est
+    <strong>Figure 7 — Import CLI.</strong> ① « Archive valide : 1 tâche(s), source 'KEYRA-PC' » · ② Simulation : la tâche est
     <strong>bloquée</strong> car son utilisateur n'est pas mappé — résolution avec <code>--user-map</code> (section 8).
   </figcaption>
 </figure>
@@ -465,7 +496,7 @@ tsbak.exe import D:\sauvegardes\export-2026-09-09</code></pre>
     <span class="mark blue" style="left:12%; top:20%">1</span>
   </div>
   <figcaption>
-    <strong>Figure 7 — validate.cmd.</strong> ① Saisie du dossier d'export → « Archive valide : 1 tâche(s), source 'KEYRA-PC' ».
+    <strong>Figure 8 — validate.cmd.</strong> ① Saisie du dossier d'export → « Archive valide : 1 tâche(s), source 'KEYRA-PC' ».
   </figcaption>
 </figure>
 
@@ -484,7 +515,7 @@ tsbak.exe import D:\sauvegardes\export-2026-09-09</code></pre>
     <span class="mark green" style="left:10%; top:45%">2</span>
   </div>
   <figcaption>
-    <strong>Figure 8 — export.cmd.</strong> ① Saisie du dossier d'export · ② Export des 168 tâches, vérification automatique, « Archive prête à être copiée ».
+    <strong>Figure 9 — export.cmd.</strong> ① Saisie du dossier d'export · ② Export des 168 tâches, vérification automatique, « Archive prête à être copiée ».
   </figcaption>
 </figure>
 
@@ -510,7 +541,7 @@ tsbak.exe import D:\sauvegardes\export-2026-09-09</code></pre>
     <span class="mark green" style="left:12%; top:65%">2</span>
   </div>
   <figcaption>
-    <strong>Figure 9 — import.cmd.</strong> ① Quatre questions guidées (dossier, dossier cible, mots de passe, simulation) · ② Rapport de simulation : « Ignorées (1) » (tâche identique) — aucun écriture.
+    <strong>Figure 10 — import.cmd.</strong> ① Quatre questions guidées (dossier, dossier cible, mots de passe, simulation) · ② Rapport de simulation : « Ignorées (1) » (tâche identique) — aucun écriture.
   </figcaption>
 </figure>
 
@@ -528,6 +559,7 @@ tsbak.exe import D:\sauvegardes\export-2026-09-09 --folder "\Restauration-2026-0
 <span class="c">:: la simulation confirme : CREATE \Restauration-2026-09-09\MSIAfterburner</span></code></pre>
 
 <h3>Comptes et mots de passe</h3>
+<p>Dans l'interface, le champ <strong>« Mot de passe unique »</strong> joue le rôle du fichier de mots de passe pour les tâches « Mot de passe requis » (voir 4.1) ; en ligne de commande, chaque utilisateur reçoit son secret via ce fichier :</p>
 <pre><code><span class="c">:: mapper un utilisateur source vers un compte de la machine cible (répétable)</span>
 tsbak.exe import D:\sauvegardes\export-2026-09-09 --user-map "OLDPC\svc_backup:NEWPC\svc_backup"
 
@@ -562,7 +594,7 @@ tsbak.exe import D:\sauvegardes\export-2026-09-09 --yes --answer-file reponses.j
   <tr><th>Symptôme</th><th>Cause / solution</th></tr>
   <tr><td>L'interface ne démarre pas sur Server 2008 R2 / 2012</td><td>WebView2 n'y est plus mis à jour → utiliser <code>tsbak.exe</code> (CLI) ou les <code>.cmd</code> du dossier <code>dist\</code>.</td></tr>
   <tr><td>« Utilisateur non mappé » / tâche bloquée au plan</td><td>Le compte source n'existe pas tel quel sur la cible → <code>--user-map "source:cible"</code> (GUI : colonne Résolution du plan).</td></tr>
-  <tr><td>« Mot de passe requis »</td><td>Fournir le mot de passe (champ masqué dans l'interface, <code>--password-file</code> en CLI) ou <code>--skip-password-tasks</code> pour ignorer ces tâches.</td></tr>
+  <tr><td>« Mot de passe requis »</td><td>Fournir le mot de passe de ce compte : champ masqué de la ligne, ou bouton <strong>« Remplir avec le même mot de passe »</strong> quand plusieurs tâches sont concernées (voir 4.1) ; en CLI, <code>--password-file</code>. <code>--skip-password-tasks</code> ignore ces tâches au lieu de bloquer l'import.</td></tr>
   <tr><td>Archive refusée à la validation</td><td>Manifeste, empreinte ou XML altéré / incomplet → réexporter proprement ; ne pas modifier les fichiers à la main.</td></tr>
   <tr><td>Archive .zip chiffrée illisible</td><td>Vérifier le mot de passe ; le format AES-256 est standard (7-Zip/WinZip le lisent).</td></tr>
   <tr><td>« Échec » à l'import réel</td><td>Lancer en administrateur (UAC) ; consulter <code>%LOCALAPPDATA%\tsbak\logs\</code> pour le détail.</td></tr>
@@ -570,7 +602,7 @@ tsbak.exe import D:\sauvegardes\export-2026-09-09 --yes --answer-file reponses.j
 </table>
 
 <div class="footer-note">
-  tsbak v1.1.0 — Guide illustré : captures réalisées sur Windows 11 (interface) et console Windows (ligne de commande).
+  tsbak v1.0.0 — Guide illustré : captures réalisées sur Windows 11 (interface) et console Windows (ligne de commande).
   Binaires : <code>dist\TaskBackupRestore.exe</code> (interface, Win10/Server 2016+) et <code>dist\tsbak.exe</code> (CLI, Server 2008 R2 → 2025+).
 </div>
 

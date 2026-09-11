@@ -1,52 +1,59 @@
 # Changelog
 
-## Non publié
+## 1.0.0 — 2026-09-12
 
-### Nouvelles fonctionnalités
+Première version publiée (dépôt GitHub **Task Backup and Restore**). Version unifiée
+`1.0.0` pour le CLI, l'interface et le manifeste Tauri.
 
-- **Import : mot de passe unique pour toutes les tâches** : dans le plan d'import,
-  un champ masqué « Mot de passe unique » + bouton « Remplir avec le même mot de
-  passe » applique un seul mot de passe à toutes les tâches « Mot de passe requis »
-  (même commande `import_set_password` que la saisie ligne par ligne — le secret ne
-  quitte jamais le processus Rust, jamais journalisé).
+### Export / import
 
-## 1.1.0 — 2026-09-10
+- **Export** : liste des tâches planifiées, sélection par cases à cocher, filtres
+  d'inclusion/exclusion (motifs `*`), export vers un dossier — XML brut + `manifest.json`
+  (empreintes SHA-256).
+- **Archive `.zip` restreinte au contenu d'export** : une archive ne contient que les XML de
+  tâches et le `manifest.json`. Tout autre fichier présent dans le dossier d'export (ancienne
+  archive, journal, note…) est **ignoré**, à la compression comme à l'extraction. Une archive
+  tierce contenant des fichiers étrangers n'écrit plus ces fichiers sur disque à l'import.
+- **Import** : dossier d'export **ou** archive `.zip` (détection automatique, protection
+  zip-slip), plan résolu tâche par tâche (créer / mettre à jour / ignorer / conflit /
+  utilisateur non mappé / mot de passe requis), **simulation (dry-run)** strictement identique
+  à l'exécution réelle, puis import réel.
+- **Mot de passe unique** : un champ masqué « Mot de passe unique » + bouton « Remplir avec le
+  même mot de passe » applique un seul secret à toutes les tâches « Mot de passe requis » du
+  plan (guide, sous-section 4.1).
+- **Élévation à la volée** : l'import réel s'exécute dans un processus enfant élevé temporaire
+  (invite UAC), l'interface reste ouverte et affiche le rapport à la fin.
 
-### Nouvelles fonctionnalités
+### Ligne de commande
 
-- **CLI : masquage des tâches Microsoft** : nouvelles options `--hide-microsoft`
-  sur `tsbak list` et `tsbak export` — les tâches système `\Microsoft\` sont
-  exclues, comme dans l'interface graphique (défaut : affichées/exportées).
+- `tsbak.exe` — même moteur que l'interface, **Windows Server 2008 R2 → 2025+**, aucune
+  dépendance runtime (COM Task Scheduler présent depuis Vista).
+- `--hide-microsoft` sur `tsbak list` et `tsbak export` : exclut les tâches système
+  `\Microsoft\`, comme l'interface où elles sont masquées par défaut.
 
-## 1.0.0 — 2026-09-10
+### Interface
 
-Première version stable publiée.
+- Onglet *Tâches & Export* : les tâches `\Microsoft\` sont **masquées par défaut** (case à
+  cocher pour les afficher) ; le compteur et la barre de statut indiquent le nombre de tâches
+  masquées.
+- Journalisation partagée avec le CLI (`%LOCALAPPDATA%\tsbak\logs\`, rétention 14 jours),
+  consultable en direct dans l'onglet *Logs*.
 
-### Nouvelles fonctionnalités
+### Sécurité
 
-- **Archives `.zip` restreintes au contenu d'export** : une archive ne contient plus que les
-  XML de tâches planifiées et le `manifest.json`. Tout autre fichier présent dans le dossier
-  d'export (ancienne archive, journal, note…) est **ignoré**, à la compression comme à
-  l'extraction. Une archive tierce contenant des fichiers étrangers n'écrit plus ces fichiers
-  sur disque à l'import.
-- **Tâches Microsoft masquées par défaut** : dans l'onglet *Tâches & Export*, les tâches
-  sous `\Microsoft\` (tâches système) sont masquées par défaut — une case à cocher
-  « Masquer les tâches Microsoft » permet de les afficher. Le compteur et la barre de statut
-  indiquent le nombre de tâches masquées.
+- Les mots de passe (comptes de tâches, archives) ne sont **jamais journalisés** ni écrits sur
+  disque par l'interface : ils restent en mémoire dans le backend et sont transmis au processus
+  élevé par un fichier de réponses JSON temporaire (ACL utilisateur, supprimé dans tous les cas).
+- Manifeste + empreintes SHA-256 + XML bien formés vérifiés **avant** toute écriture ; chemins
+  non sûrs (zip-slip) et entrées étrangères refusés.
 
-### Améliorations
+### Documentation et livraison
 
+- Guide illustré [`dist/Guide-tsbak.pdf`](dist/Guide-tsbak.pdf) et mémo d'une page
+  [`dist/Memo-motifs.pdf`](dist/Memo-motifs.pdf) (filtres d'inclusion/exclusion), sources dans
+  `dist/guide/`.
+- [`MIGRATION.md`](MIGRATION.md) — procédure pas à pas 2008 R2 → 2022.
+- Assistants `.cmd` (`export.cmd`, `import.cmd`, `validate.cmd`) pour les serveurs sans
+  interface ; [`tools/make-release.ps1`](tools/make-release.ps1) assemble le dossier de
+  livraison et l'archive de release.
 - Nettoyage de code : suppression de fonctions mortes (`manifest_summary`, `run_helper`).
-- Version unifiée à `1.0.0` (CLI, interface et manifeste Tauri).
-
-### Déjà inclus dans les versions précédentes (0.1.x, non publiées séparément)
-
-- Export XML brut + `manifest.json` (empreintes SHA-256), filtres include/exclude.
-- Import avec plan tâche par tâche : créer / mettre à jour / ignorer / conflit /
-  utilisateur non mappé / mot de passe requis, simulation (dry-run) identique à
-  l'exécution réelle.
-- Archive `.zip` optionnelle, chiffrée AES-256 (WinZip AES).
-- Élévation à la volée (processus enfant administrateur, invite UAC, interface ouverte).
-- Journalisation partagée CLI/GUI (`%LOCALAPPDATA%\tsbak\logs\`, rétention 14 jours).
-- Assistants `.cmd` (export/import/validate) pour les serveurs sans interface.
-- Guide illustré PDF complet (`dist/Guide-tsbak.pdf`).

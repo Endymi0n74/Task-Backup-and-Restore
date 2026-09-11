@@ -1,4 +1,4 @@
-# Task backup and restore — tsbak
+# Task Backup and Restore — tsbak
 
 Sauvegarde et restauration des **tâches planifiées Windows** (Task Scheduler) en **XML brut**,
 avec interface graphique **et** ligne de commande partageant le **même moteur**, la même
@@ -54,6 +54,8 @@ Le guide illustré complet est inclus : **[`dist/Guide-tsbak.pdf`](dist/Guide-ts
 
 - export / import avec l'interface graphique, captures annotées pas à pas ;
 - export / import en ligne de commande ;
+- le **mot de passe unique** d'import (section 4.1) : un seul secret appliqué à toutes les tâches
+  « Mot de passe requis » ;
 - les assistants `.cmd` pour les serveurs 2008 R2 / 2012 ;
 - options avancées (`--folder`, `--user-map`, `--password-file`, import non interactif) ;
 - sécurité, bonnes pratiques et dépannage.
@@ -128,6 +130,22 @@ Le crate `tsbak` compile sur toute plateforme (l'accès COM réel au Task Schedu
 isolé derrière `cfg(windows)`) ; seul `list`/`export`/`import` nécessitent une machine
 Windows, `validate` fonctionne partout.
 
+## Publication (release GitHub)
+
+Les artefacts distribués sont assemblés depuis `dist/` par un script unique :
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-release.ps1
+```
+
+Il lit la version dans `src-tauri/tauri.conf.json`, reconstruit
+`release\tsbak-<version>-windows\` (exe + assistants `.cmd` + `Guide-tsbak.pdf` +
+`Memo-motifs.pdf` + sources du guide) en écartant les fichiers de travail des captures et les
+**données d'export réelles** (recréées par `guide\demo\*.cmd`), puis produit
+`release\tsbak-<version>-windows.zip` — archive à entrées `/`, lisible hors Windows — et
+affiche les empreintes SHA-256. Le dossier `release/` n'est pas versionné : il est joint à la
+release GitHub.
+
 ## Test réel de bout en bout
 
 Un test `#[ignore]` exécute le flux complet contre le **vrai** scheduler Windows (COM) :
@@ -160,7 +178,7 @@ cargo test e2e_export_zip_aes_then_reimport -- --ignored --nocapture
 | `src-tauri/` | Application Tauri 2 : commandes (`commands.rs`), archives ZIP/AES (`archive.rs`), helper d'élévation (`helper.rs`), logs (`app_log.rs`) |
 | `ui/` | Frontend statique HTML/CSS/JS (sans framework) |
 | `dist/` | Livraison : `TaskBackupRestore.exe`, `tsbak.exe`, assistants `.cmd`, `Guide-tsbak.pdf` + sources du guide |
-| `tools/` | Générateur d'icône (`make_icon.py`) |
+| `tools/` | Scripts de maintenance : générateur d'icône (`make_icon.py`), assemblage des artefacts de release (`make-release.ps1`) |
 
 ## Licence
 

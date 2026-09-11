@@ -3746,7 +3746,7 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 
 [[package]]
 name = "task-backup-restore"
-version = "1.1.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "rfd",
@@ -4343,7 +4343,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tsbak"
-version = "1.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "chrono",

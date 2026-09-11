@@ -1,6 +1,6 @@
 [package]
 name = "task-backup-restore"
-version = "1.1.0"
+version = "1.0.0"
 description = "Task backup and restore — export/import des tâches planifiées Windows (Task Scheduler) avec journalisation"
 authors = ["Endymi0n74"]
 license = "MIT"
