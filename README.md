@@ -144,6 +144,33 @@ Le crate `tsbak` compile sur toute plateforme (l'accès COM réel au Task Schedu
 isolé derrière `cfg(windows)`) ; seul `list`/`export`/`import` nécessitent une machine
 Windows, `validate` fonctionne partout.
 
+### Thème de l'interface
+
+L'interface est statique (`ui/`) : le thème actif est donc **embarqué dans l'exe au moment
+de la compilation**. `ui/style.css` ne contient que la structure et les composants ; les
+palettes vivent dans `ui/themes/` et `ui/index.html` n'en active qu'une :
+
+| Feuillet | Rôle |
+|---|---|
+| [`ui/themes/legacy.css`](ui/themes/legacy.css) | **thème publié** — palette historique, active par défaut |
+| [`ui/themes/hestia.css`](ui/themes/hestia.css) | variante locale (bleu marine / orange), non publiée |
+
+```powershell
+# Variante locale dans l'interface (puis recompiler pour l'embarquer)
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\select-theme.ps1 -Action Set -Theme hestia
+
+# Thème actif
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\select-theme.ps1 -Action Status
+
+# Retour au thème publié avant toute compilation ou publication
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\select-theme.ps1 -Action Set -Theme legacy
+```
+
+Le livrable publié garde toujours la palette historique : `tools\make-release.ps1` vérifie
+le thème actif (`-Action Check -Require legacy`) et **s'arrête** si la variante est active. Une nouvelle palette = un feuillet dans `ui/themes/`, une ligne de plus dans
+`ui/index.html` et son nom dans `tools\select-theme.ps1`. Le choix du thème ne touche jamais
+`ui/style.css`, commun aux deux.
+
 ## Publication (release GitHub)
 
 Les artefacts distribués sont assemblés depuis `dist/` par un script unique :
@@ -190,9 +217,9 @@ cargo test e2e_export_zip_aes_then_reimport -- --ignored --nocapture
 |---|---|
 | `tsbak/` | Crate Rust du moteur + CLI `tsbak.exe` (`scheduler/`, `export.rs`, `import.rs`, `password.rs`, `answers.rs`, `wizard.rs`) |
 | `src-tauri/` | Application Tauri 2 : commandes (`commands.rs`), archives ZIP/AES (`archive.rs`), helper d'élévation (`helper.rs`), logs (`app_log.rs`) |
-| `ui/` | Frontend statique HTML/CSS/JS (sans framework) |
+| `ui/` | Frontend statique HTML/CSS/JS (sans framework) ; palettes dans `ui/themes/` (`legacy` = publié, `hestia` = variante locale) |
 | `dist/` | Livraison : `TaskBackupRestore.exe`, `tsbak.exe`, assistants `.cmd`, `Guide-tsbak.pdf` + sources du guide |
-| `tools/` | Scripts de maintenance : générateur d'icône (`make_icon.py`), assemblage des artefacts de release (`make-release.ps1`), fraîcheur et régénération du guide PDF (`guide-pdf.ps1`) |
+| `tools/` | Scripts de maintenance : générateur d'icône (`make_icon.py`), assemblage des artefacts de release (`make-release.ps1`), thème de l'interface (`select-theme.ps1`), fraîcheur et régénération du guide PDF (`guide-pdf.ps1`) |
 | `.github/workflows/` | Intégration continue : `guide-pdf.yml` (guide PDF régénéré et contrôlé) |
 
 ## Licence

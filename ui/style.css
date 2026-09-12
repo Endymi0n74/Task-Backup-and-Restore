@@ -1,16 +1,14 @@
-:root {
-  --bg: #f3f5f9;
-  --panel: #ffffff;
-  --border: #d9dee8;
-  --text: #1f2937;
-  --muted: #6b7280;
-  --primary: #1e5aa8;
-  --primary-dark: #143d73;
-  --success: #2f9e44;
-  --warning: #b45309;
-  --danger: #c0392b;
-  --shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
-}
+/* ============================================================
+   Interface tsbak — structure et composants du thème publié.
+
+   Ce feuillet ne définit pas la palette : les variables (--bg,
+   --primary, ...) sont fournies par le thème actif, chargé par
+   ui/index.html, et une variante peut surcharger les règles ci-dessous :
+     - ui/themes/legacy.css  : thème publié (palette historique) ;
+     - ui/themes/hestia.css  : variante locale, surcharge de ce fichier.
+
+   Bascule : tools\select-theme.ps1 -Action Set -Theme hestia|legacy
+   ============================================================ */
 
 * { box-sizing: border-box; }
 

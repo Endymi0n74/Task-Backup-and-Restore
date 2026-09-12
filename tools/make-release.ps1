@@ -25,6 +25,23 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not $Dist)   { $Dist   = Join-Path $root 'dist' }
 if (-not $OutDir) { $OutDir = Join-Path $root 'release' }
 
+# --- 0. Garde-fou de theme ------------------------------------------------
+# Le livrable publie garde le theme d'origine (palette de
+# ui/themes/legacy.css) : l'interface est embarquee dans l'exe a la
+# compilation, un theme variante ne doit jamais partir dans une release.
+$global:LASTEXITCODE = 0
+& (Join-Path $PSScriptRoot 'select-theme.ps1') -Action Check -Require legacy -ErrorOnStale
+if ($LASTEXITCODE -eq 4) {
+    Write-Host "Arret : le theme local 'hestia' est actif dans ui\index.html."
+    Write-Host "  Lancer tools\select-theme.ps1 -Action Set -Theme legacy, recompiler"
+    Write-Host "  l'interface, puis relancer ce script : la variante ne doit pas etre livree."
+    exit 1
+}
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ("Arret : tools\select-theme.ps1 a echoue (code {0})." -f $LASTEXITCODE)
+    exit 1
+}
+
 $dist = (Resolve-Path $Dist).Path
 
 # Version unique du projet (src-tauri/tauri.conf.json, cf. AGENTS.md)

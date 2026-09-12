@@ -5,11 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Task backup and restore — Sauvegarde des tâches planifiées</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- Thème actif : le feuillet sans media="not all" s'applique (l'autre reste inerte).
+       Bascule : tools\select-theme.ps1 -Action Set -Theme hestia|legacy
+       Le livrable publié garde ui/themes/legacy.css (garde-fou dans tools\make-release.ps1). -->
+  <link rel="stylesheet" href="themes/legacy.css" id="theme-legacy" />
+  <link rel="stylesheet" href="themes/hestia.css" id="theme-hestia" media="not all" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="brand-icon">⏰</span>
+      <span class="brand-icon" data-monogram="TB">⏰</span>
       <div>
         <h1>Task backup and restore</h1>
         <p>Sauvegarde des tâches planifiées Windows</p>

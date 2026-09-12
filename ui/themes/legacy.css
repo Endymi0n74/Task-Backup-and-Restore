@@ -1,0 +1,24 @@
+/* ============================================================
+   Thème publié (palette historique) — ui/themes/legacy.css
+
+   Feuillet de palette de référence : c'est celui que chargent les
+   binaires publiés (TaskBackupRestore.exe) et c'est le thème actif
+   par défaut de ui/index.html.
+
+   Bascule : tools\select-theme.ps1 -Action Set -Theme hestia|legacy
+   L'assemblage d'une release refuse de partir si la variante locale
+   est active (voir tools\make-release.ps1).
+   ============================================================ */
+:root {
+  --bg: #f3f5f9;
+  --panel: #ffffff;
+  --border: #d9dee8;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --primary: #1e5aa8;
+  --primary-dark: #143d73;
+  --success: #2f9e44;
+  --warning: #b45309;
+  --danger: #c0392b;
+  --shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+}

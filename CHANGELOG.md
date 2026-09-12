@@ -2,6 +2,17 @@
 
 ## Non publié
 
+### Interface
+
+- **Thème commutable** : `ui/style.css` ne définit plus la palette (structure et composants
+  seulement). Le **thème publié** vit dans `ui/themes/legacy.css` (palette historique, active
+  par défaut, rendu au pixel près identique à la version précédente) et la **variante locale**
+  Hestia (bleu marine / orange) dans `ui/themes/hestia.css`. `tools/select-theme.ps1` bascule
+  le thème actif (`-Action Set -Theme hestia|legacy`, `-Action Status`, `-Action Check
+  -Require legacy`) : l'interface étant embarquée dans l'exe au moment de la compilation,
+  une compilation locale peut porter la variante, tandis que `tools/make-release.ps1`
+  **refuse** de produire un livrable si la variante est active.
+
 ### Outillage
 
 - **Guide PDF automatisé** : le workflow GitHub Actions

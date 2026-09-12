@@ -9,7 +9,8 @@ Guide pour les agents (et humains) qui modifient ce dépôt. Lire aussi
   (export, import, validation, classification, mots de passe) vit ici et **doit** y rester.
 - **`src-tauri/`** — application Tauri 2 (backend Rust) : commandes, archives ZIP/AES,
   helper d'élévation, journalisation.
-- **`ui/`** — frontend statique HTML/CSS/JS (pas de framework, pas de build JS).
+- **`ui/`** — frontend statique HTML/CSS/JS (pas de framework, pas de build JS) ; les palettes
+  vivent dans `ui/themes/` (`legacy.css` = thème publié, `hestia.css` = variante locale).
 - **`dist/`** — livraison : exe portables, assistants `.cmd`, guide PDF + sources.
 
 Règle d'or : **toute logique de décision est dans `tsbak` ; `src-tauri` et `ui/` ne font
@@ -33,6 +34,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-release.ps1
 # Guide PDF : fraîcheur, régénération, empreintes
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Check
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Build
+
+# Thème de l'interface : statut, bascule, contrôle avant livraison
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\select-theme.ps1 -Action Status
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\select-theme.ps1 -Action Set -Theme hestia
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\select-theme.ps1 -Action Check -Require legacy -ErrorOnStale
 ```
 
 ## Conventions
@@ -51,6 +57,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action 
   modification.
 - **Interface** : les tâches `\Microsoft\` sont **masquées par défaut** (case à cocher
   « Masquer les tâches Microsoft » dans `ui/app.js` / `ui/index.html`).
+- **Thèmes** : `ui/style.css` ne définit **aucune variable de palette** et décrit l'aspect du
+  thème publié (structure + composants) ; les variables (`--bg`, `--primary`, ...) sont
+  fournies par le thème actif chargé par `ui/index.html` depuis `ui/themes/`
+  (`legacy.css` = thème publié, `hestia.css` = variante locale qui surcharge les règles
+  dont la variante change l'aspect). Bascule : `tools\select-theme.ps1 -Action Set -Theme
+  hestia|legacy`. Ne jamais livrer un artefact avec une variante active : `make-release.ps1`
+  contrôle `-Action Check -Require legacy` et s'arrête sinon. Ajouter une palette = un
+  feuillet dans `ui/themes/` + une entrée dans `ui/index.html` et dans `select-theme.ps1`.
+  Toute modification de `ui/style.css` doit rester sans effet sur le thème publié.
 - **Tests** : toute nouvelle logique métier dans `tsbak` doit avoir des tests unitaires
   basés sur `MockScheduler`. Les tests d'archive (roundtrip, AES, zip-slip, filtrage)
   vivent dans `src-tauri/src/archive.rs`.
