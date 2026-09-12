@@ -63,13 +63,27 @@ Le guide illustré complet est inclus : **[`dist/Guide-tsbak.pdf`](dist/Guide-ts
 Ses sources sont dans [`dist/guide/`](dist/guide/) (HTML + captures + scripts de capture). Un **mémo d'une page** sur les
 filtres d'inclusion/exclusion est aussi disponible : [`dist/Memo-motifs.pdf`](dist/Memo-motifs.pdf) (source : `dist/guide/memo-motifs.html`).
 
-Pour régénérer les PDF depuis leurs sources HTML (Edge headless, aucune installation) :
+Les PDF sont **régénérés automatiquement** dès qu'une source de `dist/guide/` change
+(workflow GitHub Actions [`guide-pdf.yml`](.github/workflows/guide-pdf.yml)) : sur la branche par défaut
+le PDF est reconstruit et commité, et une *pull request* qui modifie les sources sans régénérer
+les PDF échoue au contrôle. En local, `tools/guide-pdf.ps1` fait la même chose :
+
+```bash
+# Contrôler la fraîcheur des PDF livrés (code 4 si périmés avec -ErrorOnStale)
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Check
+
+# Régénérer les PDF puis enregistrer l'empreinte de leurs sources
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Build
+
+# Déclarer les sources actuelles couvertes SANS régénérer (PDF retouché à la main)
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Update
+```
+
+Le générateur seul reste utilisable pour un PDF isolé (Edge headless, aucune installation) :
 
 ```bash
 powershell -NoProfile -ExecutionPolicy Bypass -File dist/guide/scripts/make-pdf.ps1 `
     -Html dist/guide/guide.html -Pdf dist/Guide-tsbak.pdf
-powershell -NoProfile -ExecutionPolicy Bypass -File dist/guide/scripts/make-pdf.ps1 `
-    -Html dist/guide/memo-motifs.html -Pdf dist/Memo-motifs.pdf
 ```
 
 ## Démarrage rapide
@@ -178,7 +192,8 @@ cargo test e2e_export_zip_aes_then_reimport -- --ignored --nocapture
 | `src-tauri/` | Application Tauri 2 : commandes (`commands.rs`), archives ZIP/AES (`archive.rs`), helper d'élévation (`helper.rs`), logs (`app_log.rs`) |
 | `ui/` | Frontend statique HTML/CSS/JS (sans framework) |
 | `dist/` | Livraison : `TaskBackupRestore.exe`, `tsbak.exe`, assistants `.cmd`, `Guide-tsbak.pdf` + sources du guide |
-| `tools/` | Scripts de maintenance : générateur d'icône (`make_icon.py`), assemblage des artefacts de release (`make-release.ps1`) |
+| `tools/` | Scripts de maintenance : générateur d'icône (`make_icon.py`), assemblage des artefacts de release (`make-release.ps1`), fraîcheur et régénération du guide PDF (`guide-pdf.ps1`) |
+| `.github/workflows/` | Intégration continue : `guide-pdf.yml` (guide PDF régénéré et contrôlé) |
 
 ## Licence
 

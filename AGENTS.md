@@ -29,6 +29,10 @@ cd src-tauri && cargo test e2e_export_zip_aes_then_reimport -- --ignored --nocap
 
 # Artefacts de release (dossier + .zip dans release/, non versionné)
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-release.ps1
+
+# Guide PDF : fraîcheur, régénération, empreintes
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Check
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Build
 ```
 
 ## Conventions
@@ -53,9 +57,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-release.ps1
 - **Version** : version unique `1.0.0` dans `tsbak/Cargo.toml`, `src-tauri/Cargo.toml`
   et `src-tauri/tauri.conf.json` — les maintenir synchronisées (le CLI affiche
   `env!("CARGO_PKG_VERSION")`).
-- **Le guide PDF (`dist/Guide-tsbak.pdf`) est généré à partir de
-  `dist/guide/guide.html`** (sources + captures dans `dist/guide/`). Ne pas régénérer le
-  PDF sans raison : l'utilisateur le retouche manuellement.
+- **Guide PDF** : `dist/Guide-tsbak.pdf` et `dist/Memo-motifs.pdf` sont générés par Edge
+  headless depuis `dist/guide/guide.html` / `memo-motifs.html` + `dist/guide/shots/`
+  (`dist/guide/scripts/make-pdf.ps1`). L'empreinte des sources de chaque PDF est enregistrée
+  dans `dist/guide/pdf-sources.sha256` par `tools/guide-pdf.ps1` (`-Action Check` | `Build` |
+  `Update`). Le workflow `.github/workflows/guide-pdf.yml` **régénère et commite** les PDF dès
+  qu'une source change sur la branche par défaut, et **échoue en pull request** si le PDF
+  commité est périmé. Les octets des PDF ne sont jamais comparés (Edge n'est pas reproductible
+  et le PDF est retouché à la main) : c'est l'empreinte des sources qui tranche. Après une
+  modification des sources, relancer `-Action Build` (ou `-Action Update` si le PDF livré a été
+  retouché à la main) pour ne pas laisser le workflow signaler un PDF périmé.
 
 ## Flux d'import (à ne pas casser)
 

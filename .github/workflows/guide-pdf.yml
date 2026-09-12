@@ -1,0 +1,113 @@
+# ============================================================
+#  guide-pdf.yml - le guide PDF livre reste a jour
+#
+#  Les PDF de dist/ (Guide-tsbak.pdf, Memo-motifs.pdf) sont generes
+#  depuis dist/guide/ (guide.html / memo-motifs.html + captures +
+#  make-pdf.ps1) par Edge headless, present sur les runners Windows.
+#
+#  - push sur la branche par defaut : les PDF sont regeneres puis
+#    commites automatiquement si une source du guide a change ;
+#  - pull_request : le PDF commite est controle, le job echoue s'il est
+#    perime (les PDF regeneres sont joints en artefact pour le relecteur).
+#
+#  Le controle ne compare pas les octets des PDF (Edge n'est pas
+#  reproductible au bit, et le PDF du guide est retouche a la main) mais
+#  l'empreinte des sources enregistree dans dist/guide/pdf-sources.sha256
+#  - voir tools/guide-pdf.ps1.
+# ============================================================
+
+name: Guide PDF
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'dist/guide/**'
+      - 'dist/Guide-tsbak.pdf'
+      - 'dist/Memo-motifs.pdf'
+      - 'tools/guide-pdf.ps1'
+      - '.github/workflows/guide-pdf.yml'
+  pull_request:
+    paths:
+      - 'dist/guide/**'
+      - 'dist/Guide-tsbak.pdf'
+      - 'dist/Memo-motifs.pdf'
+      - 'tools/guide-pdf.ps1'
+      - '.github/workflows/guide-pdf.yml'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "auto = regenerer et committer ; verifier = echouer si le PDF commite est perime"
+        type: choice
+        options: [auto, verifier]
+        default: auto
+
+permissions:
+  contents: write
+
+concurrency:
+  group: guide-pdf-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  guide-pdf:
+    name: Guide PDF a jour
+    runs-on: windows-latest
+    steps:
+      - name: Recuperer le depot
+        uses: actions/checkout@v4
+
+      # Sur une pull request (et en mode "verifier") on controle sans
+      # committer ; sur un push on repare automatiquement.
+      - name: Determiner le mode (auto ou verifie)
+        id: mode
+        env:
+          EVENEMENT: ${{ github.event_name }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          $strict = ($EVENEMENT -ne 'push') -or ($MODE -eq 'verifier')
+          "strict=$($strict.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          if ($strict) {
+            Write-Host 'Mode verifie : le job echoue si le PDF commite est perime.'
+          } else {
+            Write-Host 'Mode auto : regeneration puis commit des PDF si necessaire.'
+          }
+
+      - name: Verifier la fraicheur des PDF
+        id: verif
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/guide-pdf.ps1 -Action Check
+
+      - name: Regenerer les PDF du guide
+        if: steps.verif.outputs.perime == 'true'
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File tools/guide-pdf.ps1 -Action Build
+
+      - name: Joindre les PDF regeneres
+        if: steps.verif.outputs.perime == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: guide-pdf
+          path: |
+            dist/Guide-tsbak.pdf
+            dist/Memo-motifs.pdf
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Committer les PDF regeneres
+        if: steps.verif.outputs.perime == 'true' && steps.mode.outputs.strict == 'false'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- dist/Guide-tsbak.pdf dist/Memo-motifs.pdf dist/guide/pdf-sources.sha256
+          git status --short
+          git commit -m "docs(guide): regenerer les PDF du guide [skip ci]"
+          git push
+
+      - name: Echouer si le PDF commite est perime
+        if: steps.verif.outputs.perime == 'true' && steps.mode.outputs.strict == 'true'
+        run: |
+          Write-Host "::error title=Guide PDF perime::PDF perime(s) : ${{ steps.verif.outputs.perimes }}."
+          Write-Host 'Les sources du guide ont change sans que le PDF soit regenere.'
+          Write-Host 'Regenerer localement, puis committer les PDF et dist/guide/pdf-sources.sha256 :'
+          Write-Host '  pwsh tools/guide-pdf.ps1 -Action Build'
+          Write-Host 'Les PDF regeneres sont disponibles dans l''artefact "guide-pdf" de ce job.'
+          exit 1

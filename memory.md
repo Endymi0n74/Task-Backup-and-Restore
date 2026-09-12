@@ -56,6 +56,18 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
   (45 fichiers) + `tsbak-1.0.0-windows.zip` SHA-256 `9e8213aa…` (extraction vérifiée :
   empreintes identiques à `dist/`). Publication : dépôt GitHub créé, `v1.0.0` poussé et
   release avec l'archive — voir « État actuel ».
+- **2026-09-12 (CI)** — **Guide PDF automatisé** : `tools/guide-pdf.ps1`
+  (`-Action Check` | `Build` | `Update`) enregistre l'empreinte des sources de chaque PDF dans
+  `dist/guide/pdf-sources.sha256` (guide : `guide.html` + `shots/` + `make-pdf.ps1` ; mémo :
+  `memo-motifs.html` + `shots/` + `make-pdf.ps1`) et le workflow
+  `.github/workflows/guide-pdf.yml` régénère + commite les PDF quand une source change
+  (push sur `master`, `[skip ci]`) mais **échoue** en pull request si le PDF commité est
+  périmé. Les sources sont relues par `git ls-files` (les fichiers non suivis sont signalés)
+  et les fins de ligne sont normalisées en LF avant hachage (`core.autocrlf=true` ici, aucun
+  `.gitattributes`) : mêmes empreintes en local et sur le runner. Vérifié le 2026-09-12 : les
+  deux PDF commités sont **identiques en contenu** à un build neuf (guide : 12 octets de
+  métadonnées seulement ; mémo : flux de contenu identiques, seuls version Edge 153→154 et
+  horodatage changent), donc aucune retouche manuelle n'a été écrasée.
 
 ## Décisions structurantes
 
@@ -84,9 +96,13 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
    Les tâches `TASK_LOGON_PASSWORD` sont validées par Windows lui-même au
    `RegisterTask` (HRESULT traduit) ; le mapping explicite n'est requis que pour S4U /
    jetons interactifs.
-8. **Le guide PDF est retouché manuellement** par l'utilisateur : ne pas régénérer
-   `dist/Guide-tsbak.pdf` sans demande explicite (les vignettes 8-11 doivent être
-   refaites à la main).
+8. **Guide PDF : contrôle par empreinte des sources, jamais par comparaison binaire.** Edge
+   headless n'est pas reproductible (version, horodatage, `/ID`) et le PDF peut être retouché à
+   la main : comparer les octets produirait un échec permanent. `tools/guide-pdf.ps1` enregistre
+   donc l'empreinte des sources de chaque PDF (`dist/guide/pdf-sources.sha256`) ; le workflow
+   régénère et commite les PDF sur la branche par défaut mais échoue en pull request si le PDF
+   commité est périmé. `-Action Update` déclare les sources couvertes **sans** régénérer, pour
+   un PDF livré retouché à la main.
 
 ## Leçons apprises
 
@@ -122,12 +138,13 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
 - [ ] Guide PDF : vignettes 8-11 à refaire à la main par l'utilisateur (ne pas toucher).
       Attention à la renumérotation du 2026-09-11 : les figures ≥ 4 sont décalées de +1
       (ancienne figure 8 = figure 9, etc.).
-- [ ] Guide PDF : régénérer `dist/Guide-tsbak.pdf` (`dist/guide/scripts/make-pdf.ps1`)
-      quand les vignettes seront validées — la sous-section 4.1 est déjà dans
-      `dist/guide/guide.html` mais l'utilisateur retouche le PDF à la main (ne pas régénérer
-      sans demande explicite).
+- [x] Guide PDF : régénération automatisée (2026-09-12) — `tools/guide-pdf.ps1`
+      (`Check`/`Build`/`Update`) + `.github/workflows/guide-pdf.yml` (push → régénère et
+      commite, pull request → échoue si le PDF commité est périmé). Après une retouche manuelle
+      du PDF, relancer `-Action Update` pour réaligner l'empreinte des sources.
 - [x] Artefacts de release reconstruits (`tools/make-release.ps1`, 2026-09-12).
 - [x] Rebranding **1.0.0** + dépôt GitHub **Task Backup and Restore** (`v1.0.0`, release avec
       `tsbak-1.0.0-windows.zip`).
-- [ ] Guide PDF : le PDF livré (2026-09-10) est **antérieur** à la sous-section 4.1 et aux
-      nouvelles captures CLI — le régénérer quand l'utilisateur le décidera (`make-pdf.ps1`).
+- [x] Guide PDF : le PDF livré a été régénéré (commit « regenerer le guide PDF ») puis contrôlé
+      le 2026-09-12 — contenu identique à un build neuf, empreintes de référence enregistrées
+      dans `dist/guide/pdf-sources.sha256`.

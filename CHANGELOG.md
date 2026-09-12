@@ -1,5 +1,17 @@
 # Changelog
 
+## Non publié
+
+### Outillage
+
+- **Guide PDF automatisé** : le workflow GitHub Actions
+  [`guide-pdf.yml`](.github/workflows/guide-pdf.yml) régénère `dist/Guide-tsbak.pdf` et
+  `dist/Memo-motifs.pdf` (Edge headless) et les commite dès qu'une source de `dist/guide/` change
+  sur la branche par défaut ; en *pull request* le job **échoue** si le PDF commité est périmé
+  (les PDF régénérés sont joints en artefact). Les empreintes des sources de chaque PDF sont
+  gérées par [`tools/guide-pdf.ps1`](tools/guide-pdf.ps1) (`-Action Check` | `Build` | `Update`)
+  et enregistrées dans `dist/guide/pdf-sources.sha256`.
+
 ## 1.0.0 — 2026-09-12
 
 Première version publiée (dépôt GitHub **Task Backup and Restore**). Version unifiée

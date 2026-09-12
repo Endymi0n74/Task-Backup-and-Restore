@@ -1,0 +1,6 @@
+# Empreintes des sources du guide PDF - genere par tools/guide-pdf.ps1
+# Ne pas editer a la main : modifier les sources, puis
+#   powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Build
+# <sha256 des sources>  <PDF livre>
+620719fd2dbbfc387f5bfd17cee12e6dd3c3e6ced39c151b6edf88b7603476cc  dist/Guide-tsbak.pdf
+dd1779ce6e99b898972bc1a035a633bdb182c3057822d17915cb5a988c92eea2  dist/Memo-motifs.pdf
