@@ -2,6 +2,16 @@
 
 ## Non publié
 
+### Export
+
+- **Archive `.zip` autonome** : en mode archive, les XML et le `manifest.json` sont écrits
+  dans un dossier temporaire (`%TEMP%\tsbak-export\<pid>-<nanos>`, purgé au-delà de 7 jours)
+  **puis** compressés vers le dossier choisi — le dossier de destination ne reçoit plus que
+  le fichier `.zip`, jamais les fichiers d'export à côté. Le nom d'archive est validé avant
+  toute écriture (nom invalide = aucun fichier sur disque), une archive partielle est
+  supprimée si la compression échoue, et le dossier temporaire est supprimé dans tous les
+  cas. Tests unitaires `MockScheduler` dédiés (`export_archive_tests`).
+
 ### Interface
 
 - **Thème commutable** : `ui/style.css` ne définit plus la palette (structure et composants

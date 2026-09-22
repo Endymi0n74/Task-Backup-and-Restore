@@ -18,9 +18,12 @@ vérification d'intégrité et les mêmes journaux.
   cocher permet de les afficher) — elles restent exportables si vous les affichez. En CLI,
   `tsbak list --hide-microsoft` et `tsbak export --hide-microsoft` les excluent.
 - **Archive `.zip` optionnelle**, **chiffrable AES-256** (variante WinZip AES, lisible par
-  7-Zip/WinZip). L'archive ne contient **que** les XML de tâches et le `manifest.json` :
-  tout autre fichier présent dans le dossier d'export (ancien `.zip`, journal, notes…) est
-  **ignoré**, à la compression comme à l'extraction.
+  7-Zip/WinZip). Les fichiers d'export sont d'abord écrits dans un dossier temporaire puis
+  compressés : le dossier choisi ne reçoit **que** le fichier `.zip`, jamais les XML ni le
+  `manifest.json` à côté de l'archive (le dossier temporaire est supprimé, succès ou échec).
+  L'archive ne contient **que** les XML de tâches et le `manifest.json` : tout autre fichier
+  présent dans le dossier d'export (ancien `.zip`, journal, notes…) est **ignoré**, à la
+  compression comme à l'extraction.
 - **Import** : dossier d'export **ou** archive `.zip` (détectée, extraite et validée
   automatiquement — protection zip-slip incluse), plan d'import résolu tâche par tâche
   (créer / mettre à jour / ignorer / conflit / utilisateur non mappé / mot de passe requis),

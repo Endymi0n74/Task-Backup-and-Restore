@@ -191,13 +191,13 @@ $("btn-export").addEventListener("click", async () => {
       zipName: zipEnabled ? $("zip-name").value.trim() || null : null,
       zipPassword: zipPassword || null,
     });
-    const zipNote = summary.zipPath
-      ? ` — archive ${summary.zipEncrypted ? "chiffrée AES-256" : "ZIP"} : ${summary.zipPath}`
-      : "";
-    setStatus(
-      `${summary.exported.length} tâche(s) exportée(s) vers ${dir} (${summary.skippedByFilter} ignorée(s) par les filtres)${zipNote}.`,
-      "success"
-    );
+    const skipped = `${summary.skippedByFilter} ignorée(s) par les filtres`;
+    const message = summary.zipPath
+      ? `${summary.exported.length} tâche(s) exportée(s) (${skipped}) — archive ${
+          summary.zipEncrypted ? "chiffrée AES-256" : "ZIP"
+        } : ${summary.zipPath} (seul le fichier .zip est déposé dans ${dir}).`
+      : `${summary.exported.length} tâche(s) exportée(s) vers ${dir} (${skipped}).`;
+    setStatus(message, "success");
   } catch (e) {
     showError(e);
   }

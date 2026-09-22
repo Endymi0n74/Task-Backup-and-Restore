@@ -12,7 +12,7 @@
 //! les vues renvoyées à l'interface.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
@@ -226,9 +226,12 @@ pub async fn list_tasks(
 
 /// Exporte les tâches sélectionnées (filtres include/exclude) vers `dir`.
 ///
-/// Si `zip_name` est fourni, un `.zip` (dans `dir`) est créé en plus du
-/// dossier : chiffré AES-256 si `zip_password` est non vide, Deflate seul
-/// sinon. Le mot de passe n'est jamais journalisé.
+/// Si `zip_name` est fourni, un `.zip` est créé dans `dir` et **c'est le
+/// seul contenu déposé dans le dossier** : les XML et le `manifest.json`
+/// sont d'abord écrits dans un dossier temporaire puis compressés (le
+/// dossier temporaire est supprimé, succès ou échec). Chiffré AES-256 si
+/// `zip_password` est non vide, Deflate seul sinon. Le mot de passe n'est
+/// jamais journalisé.
 #[tauri::command]
 pub async fn export_tasks(
     state: AppStateRef<'_>,
@@ -251,22 +254,107 @@ fn export_tasks_impl(
     zip_password: Option<String>,
 ) -> Result<ExportSummaryView, String> {
     let scheduler = make_scheduler()?;
-    let filter = PatternFilter::new(include, exclude);
-    let summary = export(
+    export_with(
         scheduler.as_ref(),
-        Path::new(dir),
-        true,
-        &filter,
-        &local_host_name(),
+        log,
+        dir,
+        include,
+        exclude,
+        zip_name,
+        zip_password,
     )
-    .map_err(|e| e.to_string())?;
+}
+
+/// Export sur un planificateur donné (commun à la commande, à l'interface et
+/// aux tests unitaires `MockScheduler`, sans accès COM).
+///
+/// En mode archive, les fichiers d'export sont écrits dans un dossier
+/// temporaire (`%TEMP%\tsbak-export\…`) **puis** compressés vers `dir` : le
+/// dossier de destination ne reçoit que le `.zip`, jamais les XML ni le
+/// `manifest.json` à côté de l'archive. Le dossier temporaire est supprimé
+/// dans tous les cas (succès ou échec).
+fn export_with(
+    scheduler: &dyn TaskSchedulerApi,
+    log: &AppLog,
+    dir: &str,
+    include: Vec<String>,
+    exclude: Vec<String>,
+    zip_name: Option<String>,
+    zip_password: Option<String>,
+) -> Result<ExportSummaryView, String> {
+    // Nom d'archive validé AVANT toute écriture : un nom invalide ne doit
+    // rien laisser sur disque.
+    let safe_zip = match &zip_name {
+        Some(name) => Some(sanitize_zip_name(name)?),
+        None => None,
+    };
+
+    // Mode archive : la destination est préparée d'abord (échec rapide si
+    // elle est inaccessible), puis l'export part dans un dossier temporaire.
+    let staging = match &safe_zip {
+        Some(_) => {
+            std::fs::create_dir_all(dir)
+                .map_err(|e| format!("impossible de créer {dir} : {e}"))?;
+            Some(new_staging_dir()?)
+        }
+        None => None,
+    };
+    let out_dir: &Path = match &staging {
+        Some(s) => s.as_path(),
+        None => Path::new(dir),
+    };
+    if let Some(s) = &staging {
+        log.info(&format!(
+            "Export : écriture temporaire dans {}",
+            s.display()
+        ));
+    }
+
+    let outcome = write_export(
+        scheduler,
+        log,
+        out_dir,
+        Path::new(dir),
+        &PatternFilter::new(include, exclude),
+        safe_zip.as_deref(),
+        zip_password.as_deref(),
+    );
+
+    // Le dossier temporaire est supprimé dans tous les cas ; s'il reste sur
+    // disque (plantage entre-temps), la purge à 7 jours le rattrapera.
+    if let Some(s) = &staging {
+        if let Err(e) = std::fs::remove_dir_all(s) {
+            log.warn(&format!(
+                "nettoyage du dossier temporaire {} impossible : {e}",
+                s.display()
+            ));
+        }
+    }
+    outcome
+}
+
+/// Écrit les fichiers d'export (XML bruts + `manifest.json`) dans `out_dir`,
+/// puis, si `zip_name` est fourni, l'archive `.zip` **dans `dest_dir`**.
+/// En mode archive `out_dir` est le dossier temporaire : `dest_dir` ne
+/// reçoit donc que l'archive.
+fn write_export(
+    scheduler: &dyn TaskSchedulerApi,
+    log: &AppLog,
+    out_dir: &Path,
+    dest_dir: &Path,
+    filter: &PatternFilter,
+    zip_name: Option<&str>,
+    zip_password: Option<&str>,
+) -> Result<ExportSummaryView, String> {
+    let summary = export(scheduler, out_dir, true, filter, &local_host_name())
+        .map_err(|e| e.to_string())?;
     for path in &summary.exported {
         log.info(&format!("Export : {path}"));
     }
     log.info(&format!(
         "Export terminé : {} tâche(s) vers {}, {} ignorée(s) par les filtres",
         summary.exported.len(),
-        dir,
+        dest_dir.display(),
         summary.skipped_by_filter.len()
     ));
 
@@ -275,11 +363,14 @@ fn export_tasks_impl(
     // quels (aucun recalcul).
     let mut zip_path: Option<String> = None;
     let mut zip_encrypted = false;
-    if let Some(name) = &zip_name {
-        let safe_name = sanitize_zip_name(name)?;
-        let zip_full = Path::new(dir).join(&safe_name);
-        let password = zip_password.as_deref().filter(|p| !p.is_empty());
-        archive::zip_dir(log, Path::new(dir), &zip_full, password)?;
+    if let Some(name) = zip_name {
+        let zip_full = dest_dir.join(name);
+        let password = zip_password.filter(|p| !p.is_empty());
+        if let Err(e) = archive::zip_dir(log, out_dir, &zip_full, password) {
+            // Pas d'archive partielle en cas d'échec.
+            let _ = std::fs::remove_file(&zip_full);
+            return Err(e);
+        }
         zip_encrypted = password.is_some();
         zip_path = Some(zip_full.to_string_lossy().to_string());
     }
@@ -290,6 +381,22 @@ fn export_tasks_impl(
         zip_path,
         zip_encrypted,
     })
+}
+
+/// Dossier temporaire unique d'un export en archive
+/// (`%TEMP%\tsbak-export\<pid>-<nanos>`), supprimé en fin d'export. Les
+/// dossiers laissés par un plantage (> 7 jours) sont purgés à chaque appel.
+fn new_staging_dir() -> Result<PathBuf, String> {
+    let base = std::env::temp_dir().join("tsbak-export");
+    purge_old_temp_dirs(&base);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let dir = base.join(format!("{}-{nanos}", std::process::id()));
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("dossier temporaire d'export ({}) : {e}", dir.display()))?;
+    Ok(dir)
 }
 
 /// Nom de fichier .zip sûr : pas de séparateurs, pas de remontée, extension
@@ -616,7 +723,7 @@ pub async fn extract_zip_auto(
     password: Option<String>,
 ) -> Result<String, String> {
     let base = std::env::temp_dir().join("tsbak-extract");
-    purge_old_extracts(&base);
+    purge_old_temp_dirs(&base);
 
     let name = Path::new(&zip_path)
         .file_stem()
@@ -644,8 +751,9 @@ pub async fn extract_zip_auto(
     Ok(dest.to_string_lossy().to_string())
 }
 
-/// Supprime les dossiers d'extraction automatique plus vieux que 7 jours.
-fn purge_old_extracts(base: &std::path::Path) {
+/// Supprime les dossiers temporaires de travail (`tsbak-extract`,
+/// `tsbak-export`) plus vieux de 7 jours : reliquats d'un plantage.
+fn purge_old_temp_dirs(base: &std::path::Path) {
     use std::time::{Duration, SystemTime};
     let cutoff = SystemTime::now() - Duration::from_secs(7 * 24 * 3600);
     if let Ok(entries) = std::fs::read_dir(base) {
@@ -697,6 +805,190 @@ fn build_answers(decisions: &Option<ImportDecisions>) -> AnswerFile {
         }
     }
     answers
+}
+
+// ---------------------------------------------------------------------------
+// Tests unitaires de l'export en mode archive (MockScheduler, sans COM)
+// ---------------------------------------------------------------------------
+
+/// Verifie le decompte de l'export en mode archive : le dossier de
+/// destination ne recoit QUE le `.zip` (les XML et le `manifest.json` sont
+/// d'abord ecrits dans un dossier temporaire, puis supprimes), l'export
+/// simple continue d'ecrire directement dans la destination, et un nom
+/// d'archive invalide n'ecrit rien du tout.
+#[cfg(test)]
+mod export_archive_tests {
+    use super::*;
+    use crate::app_log::AppLog;
+    use std::collections::BTreeSet;
+    use tempfile::tempdir;
+    use tsbak::model::LogonType;
+    use tsbak::scheduler::mock::{MockScheduler, MockTask};
+
+    /// Planificateur simule avec deux taches (aucun acces COM).
+    fn sample_scheduler() -> MockScheduler {
+        MockScheduler::new(true)
+            .with_task(
+                "\\Backup\\Nightly",
+                MockTask {
+                    xml: "<Task>nightly</Task>".to_string(),
+                    user_id: Some("SYSTEM".to_string()),
+                    logon_type: LogonType::ServiceAccount,
+                },
+            )
+            .with_task(
+                "\\Autre\\Nettoyage",
+                MockTask {
+                    xml: "<Task>nettoyage</Task>".to_string(),
+                    user_id: None,
+                    logon_type: LogonType::None,
+                },
+            )
+    }
+
+    /// Liste triee des entrees (fichiers/dossiers) d'un repertoire.
+    fn entry_names(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .unwrap_or_else(|e| panic!("lecture de {} : {e}", dir.display()))
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// Ensemble des dossiers de staging presents dans `%TEMP%\tsbak-export`
+    /// (vide si ce dossier n'existe pas encore).
+    fn staging_names() -> BTreeSet<String> {
+        std::fs::read_dir(std::env::temp_dir().join("tsbak-export"))
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Mode archive : la destination ne contient que le `.zip`, qui embarque
+    /// les deux XML et le manifeste ; le dossier temporaire est supprime.
+    #[test]
+    fn export_archive_ne_depose_que_le_zip() {
+        let dest = tempdir().expect("dossier de destination");
+        let logs = tempdir().expect("dossier de logs");
+        let log = AppLog::with_dir(logs.path().join("logs"));
+        let scheduler = sample_scheduler();
+        let staging_before = staging_names();
+
+        let summary = export_with(
+            &scheduler,
+            &log,
+            dest.path().to_str().expect("chemin utf-8"),
+            Vec::new(),
+            Vec::new(),
+            Some("sauvegarde.zip".to_string()),
+            None,
+        )
+        .expect("export en archive");
+
+        // La destination ne recoit QUE le .zip, jamais les XML ni le manifeste.
+        assert_eq!(
+            entry_names(dest.path()),
+            vec!["sauvegarde.zip".to_string()],
+            "la destination ne doit recevoir que le .zip"
+        );
+        let zip_full = dest.path().join("sauvegarde.zip");
+        assert!(zip_full.is_file(), "le .zip doit exister dans la destination");
+        assert_eq!(summary.zip_path.as_deref(), zip_full.to_str());
+        assert!(!summary.zip_encrypted, "aucun mot de passe = pas de chiffrement");
+        assert_eq!(summary.exported.len(), 2);
+        assert_eq!(summary.skipped_by_filter, 0);
+
+        // Le dossier temporaire de staging a bien ete supprime.
+        let after = staging_names();
+        let leftovers: Vec<String> = after.difference(&staging_before).cloned().collect();
+        assert!(
+            leftovers.is_empty(),
+            "dossier temporaire d'export non supprime : {leftovers:?}"
+        );
+
+        // L'archive embarque bien les 2 XML + manifest.json (extraction
+        // validee par les empreintes SHA-256 du manifeste).
+        let extract_dir = logs.path().join("extrait");
+        let count = archive::unzip_verified(
+            &log,
+            &zip_full,
+            &extract_dir,
+            None,
+        )
+        .expect("extraction de l'archive");
+        assert_eq!(count, 3, "2 XML + manifest.json attendus dans le .zip");
+    }
+
+    /// Mode simple (sans archive) : XML + manifest.json ecrits directement
+    /// dans la destination, aucun .zip.
+    #[test]
+    fn export_sans_archive_ecrit_dans_la_destination() {
+        let dest = tempdir().expect("dossier de destination");
+        let logs = tempdir().expect("dossier de logs");
+        let log = AppLog::with_dir(logs.path().join("logs"));
+        let scheduler = sample_scheduler();
+
+        let summary = export_with(
+            &scheduler,
+            &log,
+            dest.path().to_str().expect("chemin utf-8"),
+            Vec::new(),
+            Vec::new(),
+            None,
+            None,
+        )
+        .expect("export simple");
+
+        let names = entry_names(dest.path());
+        assert!(names.contains(&"manifest.json".to_string()), "manifest.json absent : {names:?}");
+        assert_eq!(names.iter().filter(|n| n.ends_with(".xml")).count(), 2, "{names:?}");
+        assert!(!names.iter().any(|n| n.ends_with(".zip")), "aucun .zip attendu : {names:?}");
+        assert!(summary.zip_path.is_none());
+        assert!(!summary.zip_encrypted);
+        assert_eq!(summary.exported.len(), 2);
+    }
+
+    /// Un nom d'archive invalide (« .. » interdit) echoue avant toute
+    /// ecriture : ni .zip, ni fichier d'export, ni dossier temporaire.
+    #[test]
+    fn nom_archive_invalide_ne_cree_rien() {
+        let dest = tempdir().expect("dossier de destination");
+        let logs = tempdir().expect("dossier de logs");
+        let log = AppLog::with_dir(logs.path().join("logs"));
+        let scheduler = sample_scheduler();
+        let staging_before = staging_names();
+
+        let err = export_with(
+            &scheduler,
+            &log,
+            dest.path().to_str().expect("chemin utf-8"),
+            Vec::new(),
+            Vec::new(),
+            Some("a...b".to_string()),
+            None,
+        )
+        .expect_err("le nom d'archive doit etre refuse");
+
+        assert!(
+            err.contains("invalide") || err.contains("non s"),
+            "erreur inattendue : {err}"
+        );
+        assert!(
+            entry_names(dest.path()).is_empty(),
+            "aucun fichier ne doit etre ecrit en cas de nom d'archive invalide"
+        );
+        assert_eq!(
+            staging_names(),
+            staging_before,
+            "aucun dossier temporaire ne doit etre cree"
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
