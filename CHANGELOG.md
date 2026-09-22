@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 1.1.0 — 2026-09-22
 
 ### Export
 

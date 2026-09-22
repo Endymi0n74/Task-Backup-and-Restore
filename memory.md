@@ -10,9 +10,12 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
   GitHub sous **Task Backup and Restore** (`Endymi0n74/Task-Backup-and-Restore`).
 - **Deux interfaces, un moteur** : `tsbak` (crate Rust + CLI) et `TaskBackupRestore.exe`
   (Tauri 2). Livraison portable dans `dist/`.
-- **Dernière version** : **1.0.0** (2026-09-12) — première version publiée ; les
-  numérotations intermédiaires (1.1.0 du 2026-09-10) ont été **renumérotées en 1.0.0** lors de
-  la création du dépôt (les entrées de dates ci-dessous gardent leur numérotation d'origine).
+- **Dernière version** : **1.1.0** (2026-09-22) — thème commutable + correctif d'export en
+  archive. Avant elle : **1.0.0** (2026-09-12), première version publiée ; les numérotations
+  intermédiaires (1.1.0 du 2026-09-10) ont été **renumérotées en 1.0.0** lors de la création du
+  dépôt (les entrées de dates ci-dessous gardent leur numérotation d'origine — l'entrée
+  « 2026-09-10 » parle donc d'une **ancienne** 1.1.0 abandonnée, sans rapport avec celle de
+  2026-09-22).
 
 ## Dates clés
 
@@ -68,6 +71,19 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
   deux PDF commités sont **identiques en contenu** à un build neuf (guide : 12 octets de
   métadonnées seulement ; mémo : flux de contenu identiques, seuls version Edge 153→154 et
   horodatage changent), donc aucune retouche manuelle n'a été écrasée.
+- **2026-09-22 (release 1.1.0)** — **Correctif d'export en archive** : en mode archive, les XML
+  et le `manifest.json` sont désormais écrits dans un dossier temporaire
+  (`%TEMP%\tsbak-export\<pid>-<nanos>`, purgé au-delà de 7 jours) **puis** compressés vers le
+  dossier choisi — le dossier de destination ne reçoit **plus que le `.zip`** (avant : les
+  fichiers d'export étaient déposés à côté de l'archive). Nom d'archive validé avant toute
+  écriture, archive partielle supprimée si la compression échoue, staging supprimé dans tous
+  les cas. Découpage `export_tasks_impl` → `export_with` → `write_export`, partagé avec les
+  tests e2e (`export_tasks_impl` conservée, signature inchangée) ; tests unitaires
+  `MockScheduler` dans `export_archive_tests` (destination = zip seul, export simple inchangé,
+  nom invalide sans écriture, staging toujours supprimé). **Thème commutable** livré
+  (`ui/themes/legacy.css` publié, `hestia.css` variante, `select-theme.ps1`), `make-release.ps1`
+  refuse de livrer une variante active. Version unifiée **1.1.0** dans les trois fichiers
+  canoniques.
 
 ## Décisions structurantes
 

@@ -69,7 +69,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\select-theme.ps1 -Acti
 - **Tests** : toute nouvelle logique métier dans `tsbak` doit avoir des tests unitaires
   basés sur `MockScheduler`. Les tests d'archive (roundtrip, AES, zip-slip, filtrage)
   vivent dans `src-tauri/src/archive.rs`.
-- **Version** : version unique `1.0.0` dans `tsbak/Cargo.toml`, `src-tauri/Cargo.toml`
+- **Version** : version unique `1.1.0` dans `tsbak/Cargo.toml`, `src-tauri/Cargo.toml`
   et `src-tauri/tauri.conf.json` — les maintenir synchronisées (le CLI affiche
   `env!("CARGO_PKG_VERSION")`).
 - **Guide PDF** : `dist/Guide-tsbak.pdf` et `dist/Memo-motifs.pdf` sont générés par Edge
