@@ -1,5 +1,7 @@
 # Task Backup and Restore — tsbak
 
+**🇫🇷 Français** · [🇬🇧 English](README.en.md)
+
 Sauvegarde et restauration des **tâches planifiées Windows** (Task Scheduler) en **XML brut**,
 avec interface graphique **et** ligne de commande partageant le **même moteur**, la même
 vérification d'intégrité et les mêmes journaux.
