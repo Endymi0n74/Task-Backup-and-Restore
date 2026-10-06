@@ -859,6 +859,12 @@ mod export_archive_tests {
         names
     }
 
+    /// Verrou partage par les tests qui observent le dossier de staging :
+    /// les tests tournent en parallele dans le meme processus, et la
+    /// comparaison avant/apres serait faussee par l'export concurrent d'un
+    /// autre test (meme `%TEMP%\tsbak-export`, memes suffixes pid-nanos).
+    static STAGING_LOCK: Mutex<()> = Mutex::new(());
+
     /// Ensemble des dossiers de staging presents dans `%TEMP%\tsbak-export`
     /// (vide si ce dossier n'existe pas encore).
     fn staging_names() -> BTreeSet<String> {
@@ -876,6 +882,7 @@ mod export_archive_tests {
     /// les deux XML et le manifeste ; le dossier temporaire est supprime.
     #[test]
     fn export_archive_ne_depose_que_le_zip() {
+        let _staging = STAGING_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dest = tempdir().expect("dossier de destination");
         let logs = tempdir().expect("dossier de logs");
         let log = AppLog::with_dir(logs.path().join("logs"));
@@ -960,6 +967,7 @@ mod export_archive_tests {
     /// ecriture : ni .zip, ni fichier d'export, ni dossier temporaire.
     #[test]
     fn nom_archive_invalide_ne_cree_rien() {
+        let _staging = STAGING_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dest = tempdir().expect("dossier de destination");
         let logs = tempdir().expect("dossier de logs");
         let log = AppLog::with_dir(logs.path().join("logs"));
