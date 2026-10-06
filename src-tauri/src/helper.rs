@@ -21,18 +21,20 @@
 //! ni écrit ailleurs.
 
 use std::collections::HashMap;
+use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 
 use serde::{Deserialize, Serialize};
 
-use tsbak::answers::{AnswerFile, ConflictDecision};
+use tsbak::answers::AnswerFile;
 use tsbak::import::{build_plan, execute_plan, load_and_verify, ImportOptions};
 use tsbak::password::PasswordResolver;
 use tsbak::scheduler::TaskSchedulerApi;
 use tsbak::wizard::NullInteractor;
 
 use crate::app_log::AppLog;
-use crate::commands::{ImportDecisions, ReportView};
+use crate::commands::{self, ImportDecisions, ReportView};
 
 /// Argument qui bascule l'exe en mode helper tête nue (sans Tauri).
 pub const HELPER_FLAG: &str = "--helper-import";
@@ -49,6 +51,59 @@ fn rand_suffix() -> String {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     format!("{}-{}", std::process::id(), nanos)
+}
+
+/// Âge au-delà duquel un fichier de travail est considéré comme orphelin :
+/// une invite UAC ne reste pas en attente plus d'une heure (au-delà,
+/// l'import est considéré comme abandonné et le secret est purgé).
+const WORK_FILE_MAX_AGE: Duration = Duration::from_secs(3600);
+
+/// Purge les fichiers de travail orphelins (plus vieux d'une heure) :
+/// appelée à l'ouverture de l'interface et avant chaque import élevé.
+/// Retourne le nombre de fichiers supprimés.
+pub(crate) fn purge_stale_work_files() -> usize {
+    purge_work_files_in(&temp_work_dir(), Some(WORK_FILE_MAX_AGE))
+}
+
+/// Purge **tous** les fichiers de travail du dossier temporaire (fichier de
+/// réponses contenant brièvement les mots de passe, fichiers de résultat) :
+/// appelée à la fermeture de l'interface, où aucun secret ne doit survivre.
+/// Retourne le nombre de fichiers supprimés.
+pub(crate) fn purge_work_files() -> usize {
+    purge_work_files_in(&temp_work_dir(), None)
+}
+
+/// Supprime les fichiers `answers-*` / `result-*` de `dir` — les plus vieux
+/// que `max_age` seulement (tous si `None`). Les autres fichiers sont
+/// laissés intacts. Le dossier inexistant n'est pas une erreur.
+fn purge_work_files_in(dir: &Path, max_age: Option<Duration>) -> usize {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return 0;
+    };
+    let now = SystemTime::now();
+    let mut removed = 0usize;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !name.starts_with("answers-") && !name.starts_with("result-") {
+            continue;
+        }
+        if let Some(age) = max_age {
+            let older = entry
+                .metadata()
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|mtime| now.duration_since(mtime).ok())
+                .map(|elapsed| elapsed > age)
+                .unwrap_or(false);
+            if !older {
+                continue;
+            }
+        }
+        if fs::remove_file(entry.path()).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +158,7 @@ pub fn run_helper_args(args: &[String]) -> i32 {
         }
     };
 
-    let result = match make_scheduler() {
+    let result = match commands::make_scheduler() {
         Ok(scheduler) => {
             let outcome =
                 helper_import_with(&log, scheduler.as_ref(), Path::new(&dir), &answers, dry_run, target_folder.as_deref());
@@ -119,20 +174,6 @@ pub fn run_helper_args(args: &[String]) -> i32 {
     let code = if result.ok && write_ok { 0 } else { 2 };
     log.info(&format!("Helper terminé (code {code})"));
     code
-}
-
-/// Connecte le planificateur Windows (uniquement disponible sur Windows).
-fn make_scheduler() -> Result<Box<dyn TaskSchedulerApi>, String> {
-    #[cfg(windows)]
-    {
-        tsbak::scheduler::windows_impl::WindowsScheduler::connect()
-            .map(|s| Box::new(s) as Box<dyn TaskSchedulerApi>)
-            .map_err(|e| e.to_string())
-    }
-    #[cfg(not(windows))]
-    {
-        Err("l'accès au planificateur de tâches Windows nécessite Windows".to_string())
-    }
 }
 
 /// Cœur du helper, testable avec un scheduler simulé : charge l'archive,
@@ -165,39 +206,11 @@ pub(crate) fn helper_import_with(
 
     let report = execute_plan(scheduler, &plan, dry_run).map_err(|e| e.to_string())?;
 
-    for path in &report.created {
-        log.info(&format!("Import : créée {path}"));
-    }
-    for path in &report.updated {
-        log.info(&format!("Import : mise à jour {path}"));
-    }
-    for path in &report.skipped {
-        log.info(&format!("Import : ignorée {path}"));
-    }
-    for (path, reason) in &report.blocked {
-        log.warn(&format!("Import : bloquée {path} ({reason})"));
-    }
-    for (path, reason) in &report.failed {
-        log.error(&format!("Import : échec {path} ({reason})"));
-    }
-    log.info(&format!(
-        "{verb} terminé : {} créée(s), {} mise(s) à jour, {} ignorée(s), {} bloquée(s), {} échec(s)",
-        report.created.len(),
-        report.updated.len(),
-        report.skipped.len(),
-        report.blocked.len(),
-        report.failed.len()
-    ));
-
-    Ok(ReportView {
-        dry_run,
-        created: report.created.clone(),
-        updated: report.updated.clone(),
-        skipped: report.skipped.clone(),
-        blocked: report.blocked.clone(),
-        failed: report.failed.clone(),
-        exit_code: report.exit_code(),
-    })
+    // Étapes puis synthèse : même journalisation que la commande
+    // `import_execute` (partagée dans `commands`), aucun secret dedans.
+    let view = commands::report_view(&report, dry_run);
+    commands::log_import_report(log, verb, &view);
+    Ok(view)
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +227,11 @@ pub fn run_elevated_import(
     passwords: &HashMap<String, String>,
     target_folder: Option<&str>,
 ) -> Result<ReportView, String> {
+    // Fichiers de travail orphelins d'une session précédente (interface
+    // fermée avant la fin de l'UAC, plantage…) : nettoyés avant chaque
+    // import — un fichier de réponses (secret) ne doit jamais s'accumuler.
+    purge_stale_work_files();
+
     let work = temp_work_dir();
     std::fs::create_dir_all(&work)
         .map_err(|e| format!("impossible de créer {} : {e}", work.display()))?;
@@ -228,7 +246,10 @@ pub fn run_elevated_import(
         let _ = std::fs::remove_file(result_path);
     };
 
-    let answers = build_answer_file(decisions, passwords);
+    // Décisions de l'interface + mots de passe mémorisés en mémoire (le
+    // fichier de réponses est la seule écriture transitoire d'un secret).
+    let mut answers = commands::build_answers(Some(decisions));
+    answers.passwords = passwords.clone();
     if let Err(e) = write_json(&answers_path, &answers) {
         cleanup(&answers_path, &result_path);
         return Err(format!("impossible d'écrire le fichier de réponses : {e}"));
@@ -274,25 +295,6 @@ pub fn run_elevated_import(
     result
         .report
         .ok_or_else(|| "le processus administrateur n'a pas produit de rapport".to_string())
-}
-
-/// Construit le fichier de réponses (format `AnswerFile` de tsbak) à partir
-/// des décisions de l'interface et des mots de passe mémorisés en mémoire.
-fn build_answer_file(decisions: &ImportDecisions, passwords: &HashMap<String, String>) -> AnswerFile {
-    let mut answers = AnswerFile {
-        passwords: passwords.clone(),
-        ..AnswerFile::default()
-    };
-    answers.user_map = decisions.user_map.clone();
-    answers.skip_tasks = decisions.skip_tasks.clone();
-    for (path, decision) in &decisions.conflicts {
-        let policy = match decision.as_str() {
-            "overwrite" => ConflictDecision::Overwrite,
-            _ => ConflictDecision::Skip,
-        };
-        answers.conflict_decisions.insert(path.clone(), policy);
-    }
-    answers
 }
 
 /// Échappe un argument pour la ligne de commande Windows (les guillemets
@@ -361,6 +363,7 @@ mod tests {
     use super::*;
     use crate::app_log::AppLog;
     use std::collections::HashMap;
+    use tsbak::answers::ConflictDecision;
     use tsbak::export::{export, PatternFilter};
     use tsbak::model::LogonType;
     use tsbak::scheduler::mock::{MockScheduler, MockTask};
@@ -479,7 +482,8 @@ mod tests {
         let mut passwords = HashMap::new();
         passwords.insert("NEWPC\\bob".to_string(), "m0t de passe".to_string());
 
-        let answers = build_answer_file(&decisions, &passwords);
+        let mut answers = commands::build_answers(Some(&decisions));
+        answers.passwords = passwords;
         assert_eq!(answers.passwords.get("NEWPC\\bob").map(String::as_str), Some("m0t de passe"));
         assert!(matches!(
             answers.conflict_decisions.get("\\A"),
@@ -523,5 +527,35 @@ mod tests {
     fn quote_arg_handles_paths() {
         assert_eq!(quote_arg(r"C:\Users\a b\dump"), "\"C:\\Users\\a b\\dump\"");
         assert_eq!(quote_arg("x\"y"), "\"xy\"");
+    }
+
+    #[test]
+    fn purge_work_files_retire_reponses_et_resultats() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("answers-99-1.json"), "secret").unwrap();
+        fs::write(dir.path().join("result-99-1.json"), "{}").unwrap();
+        // Un fichier sans rapport avec l'import élevé n'est pas touché.
+        fs::write(dir.path().join("notes.txt"), "à conserver").unwrap();
+
+        let removed = purge_work_files_in(dir.path(), None);
+        assert_eq!(removed, 2, "réponses + résultat doivent être purgés");
+        assert!(dir.path().join("notes.txt").exists(), "les autres fichiers restent");
+        // Idempotent : rien de plus à supprimer.
+        assert_eq!(purge_work_files_in(dir.path(), None), 0);
+    }
+
+    #[test]
+    fn purge_work_files_respect_lage_impose() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("answers-frais.json"), "secret").unwrap();
+
+        // Fichier récent : conservé avec une limite d'âge (une élévation en
+        // attente d'UAC ne doit pas perdre son fichier de réponses).
+        let removed = purge_work_files_in(dir.path(), Some(WORK_FILE_MAX_AGE));
+        assert_eq!(removed, 0, "un fichier frais ne doit pas être purgé");
+        assert!(dir.path().join("answers-frais.json").exists());
+
+        // Dossier inexistant : pas une erreur, rien à supprimer.
+        assert_eq!(purge_work_files_in(&dir.path().join("absent"), None), 0);
     }
 }

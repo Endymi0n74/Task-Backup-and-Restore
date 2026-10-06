@@ -6,6 +6,8 @@ mod archive;
 mod commands;
 /// Import en processus enfant élevé (mode `--helper-import`) : voir `helper.rs`.
 pub mod helper;
+/// Arrêt déterministe à la fermeture de la fenêtre : voir `shutdown.rs`.
+mod shutdown;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -32,11 +34,30 @@ pub fn run() {
         .setup(|app| {
             let log = AppLog::init();
             log.info("Task backup and restore démarré");
+            // Fichiers de travail orphelins d'une session précédente
+            // (interface fermée avant la fin d'une élévation…) : purgés dès
+            // l'ouverture — un fichier de réponses ne doit jamais survivre.
+            let stale = helper::purge_stale_work_files();
+            if stale > 0 {
+                log.warn(&format!(
+                    "Purge de {stale} fichier(s) de travail orphelin(s) de l'import élevé"
+                ));
+            }
             app.manage(AppState {
                 log,
                 passwords: Mutex::new(HashMap::new()),
             });
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Application mono-fenêtre : la fermeture de la fenêtre est la
+            // fin de session. Sortie déterministe du processus AVANT toute
+            // déconnexion WebView2 — sous Windows Server 2016/2019, cette
+            // déconnexion pouvait laisser `TaskBackupRestore.exe` vivant
+            // (cf. `shutdown.rs`).
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                shutdown::exit_on_window_close(window.app_handle());
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::list_tasks,
