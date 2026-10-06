@@ -28,12 +28,6 @@ fn make_scheduler() -> Result<Box<dyn TaskSchedulerApi>> {
     ))
 }
 
-fn local_host_name() -> String {
-    std::env::var("COMPUTERNAME")
-        .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_else(|_| "unknown-host".to_string())
-}
-
 fn print_report(report: &ExecutionReport, dry_run: bool) {
     let verb = if dry_run { "seraient" } else { "ont ete" };
     println!();
@@ -82,7 +76,7 @@ fn run() -> Result<i32> {
         "tsbak {} : commande {} sur {}",
         env!("CARGO_PKG_VERSION"),
         cmd_name,
-        local_host_name()
+        tsbak::local_host_name()
     ));
     match cli.command {
         Command::List { recursive, hide_microsoft } => {
@@ -120,7 +114,7 @@ fn run() -> Result<i32> {
             }
             let filter = PatternFilter::new(include, exclude);
             tsbak::log::info(format!("Export vers {}", dir.display()));
-            let summary = export(scheduler.as_ref(), &dir, true, &filter, &local_host_name())?;
+            let summary = export(scheduler.as_ref(), &dir, true, &filter, &tsbak::local_host_name())?;
             println!(
                 "{} tache(s) exportee(s) vers {}",
                 summary.exported.len(),

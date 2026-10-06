@@ -47,12 +47,6 @@ pub(crate) fn make_scheduler() -> Result<Box<dyn TaskSchedulerApi>, String> {
     }
 }
 
-fn local_host_name() -> String {
-    std::env::var("COMPUTERNAME")
-        .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_else(|_| "unknown-host".to_string())
-}
-
 // ---------------------------------------------------------------------------
 // Vues sérialisables (sans secret)
 // ---------------------------------------------------------------------------
@@ -182,7 +176,8 @@ fn plan_item_view(item: &PlanItem) -> PlanItemView {
     }
 }
 
-fn report_view(report: &tsbak::model::ExecutionReport, dry_run: bool) -> ReportView {
+/// Convertit un rapport d'exécution métier en vue sérialisable (sans secret).
+pub(crate) fn report_view(report: &tsbak::model::ExecutionReport, dry_run: bool) -> ReportView {
     ReportView {
         dry_run,
         created: report.created.clone(),
@@ -192,6 +187,40 @@ fn report_view(report: &tsbak::model::ExecutionReport, dry_run: bool) -> ReportV
         failed: report.failed.clone(),
         exit_code: report.exit_code(),
     }
+}
+
+/// Journalise la synthèse d'un rapport d'import (aucun secret).
+pub(crate) fn log_import_summary(log: &AppLog, verb: &str, report: &ReportView) {
+    log.info(&format!(
+        "{verb} terminé : {} créée(s), {} mise(s) à jour, {} ignorée(s), {} bloquée(s), {} échec(s)",
+        report.created.len(),
+        report.updated.len(),
+        report.skipped.len(),
+        report.blocked.len(),
+        report.failed.len()
+    ));
+}
+
+/// Journalise les étapes d'un rapport (créées / mises à jour / ignorées /
+/// bloquées / échecs) puis sa synthèse. Partagé entre l'interface et le
+/// processus helper — même ligne de journal des deux côtés.
+pub(crate) fn log_import_report(log: &AppLog, verb: &str, report: &ReportView) {
+    for path in &report.created {
+        log.info(&format!("Import : créée {path}"));
+    }
+    for path in &report.updated {
+        log.info(&format!("Import : mise à jour {path}"));
+    }
+    for path in &report.skipped {
+        log.info(&format!("Import : ignorée {path}"));
+    }
+    for (path, reason) in &report.blocked {
+        log.warn(&format!("Import : bloquée {path} ({reason})"));
+    }
+    for (path, reason) in &report.failed {
+        log.error(&format!("Import : échec {path} ({reason})"));
+    }
+    log_import_summary(log, verb, report);
 }
 
 // ---------------------------------------------------------------------------
@@ -346,7 +375,7 @@ fn write_export(
     zip_name: Option<&str>,
     zip_password: Option<&str>,
 ) -> Result<ExportSummaryView, String> {
-    let summary = export(scheduler, out_dir, true, filter, &local_host_name())
+    let summary = export(scheduler, out_dir, true, filter, &tsbak::local_host_name())
         .map_err(|e| e.to_string())?;
     for path in &summary.exported {
         log.info(&format!("Export : {path}"));
@@ -481,7 +510,7 @@ fn import_build_plan_impl(
     let (manifest, xmls) = load_and_verify(Path::new(dir)).map_err(|e| e.to_string())?;
     let scheduler = make_scheduler()?;
 
-    let answers = build_answers(&decisions);
+    let answers = build_answers(decisions.as_ref());
     let pw = passwords.lock().unwrap().clone();
     let resolver = PasswordResolver::new(None, Some(pw), false);
     let options = ImportOptions {
@@ -585,21 +614,16 @@ async fn import_execute_impl(
         })
         .await
         .map_err(|e| format!("tâche d'élévation interrompue : {e}"))??;
-        log.info(&format!(
-            "Import (admin) terminé : {} créée(s), {} mise(s) à jour, {} ignorée(s), {} bloquée(s), {} échec(s)",
-            report.created.len(),
-            report.updated.len(),
-            report.skipped.len(),
-            report.blocked.len(),
-            report.failed.len()
-        ));
+        // Les étapes détaillées ont déjà été journalisées par le helper
+        // (même fichier de logs) : ici, la synthèse uniquement.
+        log_import_summary(log, "Import (admin)", &report);
         return Ok(report);
     }
 
     let (manifest, xmls) = load_and_verify(Path::new(dir)).map_err(|e| e.to_string())?;
     let scheduler = make_scheduler()?;
 
-    let answers = build_answers(&Some(decisions));
+    let answers = build_answers(Some(&decisions));
     let pw = passwords.lock().unwrap().clone();
     let resolver = PasswordResolver::new(None, Some(pw), false);
     let options = ImportOptions {
@@ -624,32 +648,9 @@ async fn import_execute_impl(
     log.info(&format!("{verb} depuis {dir} ({} tâche(s))", plan.len()));
 
     let report = execute_plan(scheduler.as_ref(), &plan, dry_run).map_err(|e| e.to_string())?;
-
-    for path in &report.created {
-        log.info(&format!("Import : créée {path}"));
-    }
-    for path in &report.updated {
-        log.info(&format!("Import : mise à jour {path}"));
-    }
-    for path in &report.skipped {
-        log.info(&format!("Import : ignorée {path}"));
-    }
-    for (path, reason) in &report.blocked {
-        log.warn(&format!("Import : bloquée {path} ({reason})"));
-    }
-    for (path, reason) in &report.failed {
-        log.error(&format!("Import : échec {path} ({reason})"));
-    }
-    log.info(&format!(
-        "{verb} terminé : {} créée(s), {} mise(s) à jour, {} ignorée(s), {} bloquée(s), {} échec(s)",
-        report.created.len(),
-        report.updated.len(),
-        report.skipped.len(),
-        report.blocked.len(),
-        report.failed.len()
-    ));
-
-    Ok(report_view(&report, dry_run))
+    let view = report_view(&report, dry_run);
+    log_import_report(log, verb, &view);
+    Ok(view)
 }
 
 /// Dernières lignes du journal (rafraîchissement incrémental via `after_seq`).
@@ -693,7 +694,6 @@ fn current_is_elevated() -> bool {
         false
     }
 }
-
 
 /// Ouvre une boîte de dialogue de sélection de dossier (interface native).
 #[tauri::command]
@@ -790,8 +790,10 @@ pub async fn extract_zip_archive(
 // ---------------------------------------------------------------------------
 
 /// Convertit les décisions de l'interface en fichier de réponses `AnswerFile`
-/// (format déjà supporté par la logique d'import de `tsbak`).
-fn build_answers(decisions: &Option<ImportDecisions>) -> AnswerFile {
+/// (format déjà supporté par la logique d'import de `tsbak`). Partagé avec
+/// le processus helper élevé (`helper::run_elevated_import`), qui y ajoute
+/// les mots de passe mémorisés en mémoire.
+pub(crate) fn build_answers(decisions: Option<&ImportDecisions>) -> AnswerFile {
     let mut answers = AnswerFile::default();
     if let Some(d) = decisions {
         answers.user_map = d.user_map.clone();
