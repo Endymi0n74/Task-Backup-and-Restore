@@ -101,9 +101,15 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
   l'interface fermait pendant l'UAC. **Ménage** : journalisation d'import dédoublonnée
   (`log_import_report`/`log_import_summary` partagés helper ↔ commande), une seule
   implémentation de `make_scheduler` / `build_answers` / `local_host_name` (ce dernier
-  monté dans le crate `tsbak`), tests unitaires de la purge. **CI** : nouveau workflow `ci.yml` (`cargo test` des deux
-  crates sur `windows-latest` à chaque push/PR — auparavant seul le guide PDF était
-  contrôlé). Version unifiée **1.1.1** dans les trois fichiers canoniques.
+  monté dans le crate `tsbak`), tests unitaires de la purge. **CI** : nouveau workflow
+  `ci.yml` (`cargo test` des deux crates sur `windows-latest` à chaque push/PR —
+  auparavant seul le guide PDF était contrôlé), `actions/checkout` passé à `v5`.
+  Version unifiée **1.1.1** dans les trois fichiers canoniques. **Publication** :
+  `v1.1.1` poussé + release GitHub `tsbak-1.1.1-windows.zip` (46 fichiers),
+  empreintes `TaskBackupRestore.exe` `15a05d62…`, `tsbak.exe` `5f1ee00d…`,
+  zip `bfe47186…` ; les deux étapes de la CI sont vertes. Premier run en échec :
+  test `nom_archive_invalide_ne_cree_rien` faussé par l'export concurrent d'un
+  autre test (cf. leçon ci-dessous) — corrigé par un verrou partagé (`a3fc189`).
 
 ## Décisions structurantes
 
@@ -142,6 +148,12 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
 
 ## Leçons apprises
 
+- **Tests parallèles et état global partagé** : comparer un dossier temporaire
+  global (`%TEMP%\tsbak-export`) avant/après dans deux tests `#[test]` est faux
+  dès que les tests tournent en parallèle dans le même processus (les suffixes
+  `pid-nanos` ne distinguent pas les créateurs — observé en CI, 24/25). Un
+  `static STAGING_LOCK: Mutex<()>` partagé par les tests observateurs suffit
+  (`.lock().unwrap_or_else(|e| e.into_inner())` pour survivre au poison).
 - **`windows` 0.58 : `ShellExecuteExW` / `SHELLEXECUTEINFOW` exigent la feature
   `Win32_System_Registry`** (la structure porte un champ `hkeyClass: HKEY`) : la
   retirer casse la compilation de `helper.rs` **sans aucun appel direct à la
@@ -188,3 +200,12 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
 - [x] Guide PDF : le PDF livré a été régénéré (commit « regenerer le guide PDF ») puis contrôlé
       le 2026-09-12 — contenu identique à un build neuf, empreintes de référence enregistrées
       dans `dist/guide/pdf-sources.sha256`.
+- [x] **Release 1.1.1** publiée le 2026-10-06 (`v1.1.1` + `tsbak-1.1.1-windows.zip`) : fermeture
+      déterministe (bug Server 2016/2019), purge des secrets transitoires, ménage, CI `cargo test`
+      verte (y compris après correction du test de staging).
+- [ ] **`cargo fmt`** : le dépôt n'a jamais été formaté (diffs rustfmt massifs partout) — à faire
+      dans un commit dédié, sans mélanger avec d'autres sujets, puis ajouter `cargo fmt --check`
+      à `ci.yml` (ne pas l'activer avant). `clippy` est déjà propre hors remarques de style.
+- [ ] Vérifier la fermeture sur un **vrai** Windows Server 2016/2019 : non reproductible sur
+      Win11 (le binaire 1.1.0 y fermait déjà proprement) ; le correctif est déterministe par
+      construction (`process::exit` avant toute déconnexion).

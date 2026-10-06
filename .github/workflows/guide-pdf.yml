@@ -55,7 +55,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Recuperer le depot
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Sur une pull request (et en mode "verifier") on controle sans
       # committer ; sur un push on repare automatiquement.
