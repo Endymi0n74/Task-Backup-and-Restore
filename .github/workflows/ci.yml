@@ -1,0 +1,38 @@
+# Tests Rust à chaque push / pull request.
+# Le contrôle du guide PDF (guide-pdf.yml) reste le seul autre job :
+# ici on vérifie que les deux crates compilent et que leurs tests passent
+# sur Windows (cibles réelles : COM Task Scheduler, WebView2 présent sur
+# les runners). Le test e2e réel reste #[ignore] (lancé manuellement).
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    name: Tests (tsbak + interface)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            tsbak
+            src-tauri
+
+      - name: Tests du moteur (tsbak)
+        working-directory: tsbak
+        run: cargo test --locked
+
+      - name: Tests de l'interface (src-tauri)
+        working-directory: src-tauri
+        run: cargo test --locked

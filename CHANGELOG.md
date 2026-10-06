@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.1.1 — 2026-10-06
+
+### Fermeture
+
+- **Le processus ne survit plus à la fermeture de la fenêtre** (bug observé
+  sous Windows Server 2016 / 2019 : `TaskBackupRestore.exe` restait actif dans
+  le gestionnaire des tâches après avoir fermé l'interface). L'application est
+  mono-fenêtre : la fermeture de la fenêtre déclenche désormais une **sortie
+  déterministe** du processus (`src-tauri/src/shutdown.rs`), *avant* toute
+  déconnexion WebView2 — l'étape qui pouvait bloquer sur ces serveurs. La
+  dernière ligne de journal est écrite avant la sortie ; les processus enfants
+  WebView2 détectent la fin de l'hôte et s'arrêtent d'eux-mêmes.
+
+### Sécurité
+
+- **Purge des fichiers de travail orphelins de l'import élevé**
+  (`%TEMP%\task-backup-restore\`) : le fichier de réponses, qui contient
+  brièvement les mots de passe sur disque, est supprimé dès l'ouverture de
+  l'interface (fichiers de plus d'une heure), avant chaque import élevé, et
+  **à la fermeture** (tous les fichiers). Plus aucun secret abandonné si
+  l'interface est fermée pendant l'invite UAC ou si une session précédente a
+  planté. Tests unitaires dédiés.
+
+### Ménage de code
+
+- Journalisation d'import dédoublonnée : `log_import_report` (étapes +
+  synthèse) et `log_import_summary` (synthèse) sont désormais partagés entre
+  la commande `import_execute` et le processus helper — même lignes de
+  journal des deux côtés, une seule implémentation.
+- Une seule implémentation de `make_scheduler`, de `build_answers` (décisions
+  → fichier de réponses, complété par les mots de passe côté helper) et de
+  `local_host_name` (désormais dans le crate `tsbak`, partagé par le CLI et
+  l'interface).
+
+### Intégration continue
+
+- Nouveau workflow [`ci.yml`](.github/workflows/ci.yml) : `cargo test` des deux
+  crates (`tsbak` + `src-tauri`) à chaque *push* / *pull request* sur Windows —
+  le contrôle du guide PDF restait jusqu'ici le seul job automatisé.
+
 ## 1.1.0 — 2026-09-22
 
 ### Export

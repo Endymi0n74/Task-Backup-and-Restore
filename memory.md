@@ -10,8 +10,10 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
   GitHub sous **Task Backup and Restore** (`Endymi0n74/Task-Backup-and-Restore`).
 - **Deux interfaces, un moteur** : `tsbak` (crate Rust + CLI) et `TaskBackupRestore.exe`
   (Tauri 2). Livraison portable dans `dist/`.
-- **Dernière version** : **1.1.0** (2026-09-22) — thème commutable + correctif d'export en
-  archive. Avant elle : **1.0.0** (2026-09-12), première version publiée ; les numérotations
+- **Dernière version** : **1.1.1** (2026-10-06) — sortie déterministe à la fermeture
+  (processus fantôme sur Server 2016/2019) + purge des fichiers de travail secret.
+  Avant elle : **1.1.0** (2026-09-22) — thème commutable + correctif d'export en
+  archive, et **1.0.0** (2026-09-12), première version publiée ; les numérotations
   intermédiaires (1.1.0 du 2026-09-10) ont été **renumérotées en 1.0.0** lors de la création du
   dépôt (les entrées de dates ci-dessous gardent leur numérotation d'origine — l'entrée
   « 2026-09-10 » parle donc d'une **ancienne** 1.1.0 abandonnée, sans rapport avec celle de
@@ -84,6 +86,24 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
   (`ui/themes/legacy.css` publié, `hestia.css` variante, `select-theme.ps1`), `make-release.ps1`
   refuse de livrer une variante active. Version unifiée **1.1.0** dans les trois fichiers
   canoniques.
+- **2026-10-06 (release 1.1.1)** — **Sortie déterministe à la fermeture** : sous Windows
+  Server 2016/2019, fermer l'interface laissait `TaskBackupRestore.exe` actif dans les
+  processus (la déconnexion WebView2 / la fin de boucle d'événements pouvait bloquer sur
+  ces serveurs). L'application étant mono-fenêtre, `on_window_event` intercepte
+  maintenant `CloseRequested` et appelle `shutdown::exit_on_window_close` (nouveau module
+  `src-tauri/src/shutdown.rs`) : purge des fichiers de travail, dernière ligne de
+  journal, `std::process::exit(0)` — **avant** toute déconnexion d'objets. Vérifié sur
+  Win11 (binaire 1.1.0 → fermeture identique, aucun enfant WebView2 résiduel) ; la
+  détermination rend l'ancien biais 2016/2019 impossible par construction.
+  **Purge des secrets transitoires** : les fichiers de `%TEMP%\task-backup-restore\`
+  (`answers-*` avec mots de passe, `result-*`) sont purgés à l'ouverture (> 1 h), avant
+  chaque import élevé et **en totalité à la fermeture** — plus aucun secret abandonné si
+  l'interface fermait pendant l'UAC. **Ménage** : journalisation d'import dédoublonnée
+  (`log_import_report`/`log_import_summary` partagés helper ↔ commande), une seule
+  implémentation de `make_scheduler` / `build_answers` / `local_host_name` (ce dernier
+  monté dans le crate `tsbak`), tests unitaires de la purge. **CI** : nouveau workflow `ci.yml` (`cargo test` des deux
+  crates sur `windows-latest` à chaque push/PR — auparavant seul le guide PDF était
+  contrôlé). Version unifiée **1.1.1** dans les trois fichiers canoniques.
 
 ## Décisions structurantes
 
@@ -122,6 +142,10 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
 
 ## Leçons apprises
 
+- **`windows` 0.58 : `ShellExecuteExW` / `SHELLEXECUTEINFOW` exigent la feature
+  `Win32_System_Registry`** (la structure porte un champ `hkeyClass: HKEY`) : la
+  retirer casse la compilation de `helper.rs` **sans aucun appel direct à la
+  registry**. Ne pas juger une feature `windows` inutile d'après les appels du code.
 - **COM `windows-rs` 0.58** : `IPrincipal::UserId` et `IPrincipal::LogonType` utilisent
   des paramètres de sortie (`*mut BSTR` / `*mut TASK_LOGON_TYPE`), pas des retours directs.
 - **`CoUninitialize` avant libération COM** → STATUS_ACCESS_VIOLATION à la fermeture :

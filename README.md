@@ -2,6 +2,10 @@
 
 **🇫🇷 Français** · [🇬🇧 English](README.en.md)
 
+[![CI](https://github.com/Endymi0n74/Task-Backup-and-Restore/actions/workflows/ci.yml/badge.svg)](https://github.com/Endymi0n74/Task-Backup-and-Restore/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Endymi0n74/Task-Backup-and-Restore?label=release)](https://github.com/Endymi0n74/Task-Backup-and-Restore/releases)
+[![Licence](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+
 Sauvegarde et restauration des **tâches planifiées Windows** (Task Scheduler) en **XML brut**,
 avec interface graphique **et** ligne de commande partageant le **même moteur**, la même
 vérification d'intégrité et les mêmes journaux.
