@@ -10,9 +10,11 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
   GitHub sous **Task Backup and Restore** (`Endymi0n74/Task-Backup-and-Restore`).
 - **Deux interfaces, un moteur** : `tsbak` (crate Rust + CLI) et `TaskBackupRestore.exe`
   (Tauri 2). Livraison portable dans `dist/`.
-- **Dernière version** : **1.1.1** (2026-10-06) — sortie déterministe à la fermeture
-  (processus fantôme sur Server 2016/2019) + purge des fichiers de travail secret.
-  Avant elle : **1.1.0** (2026-09-22) — thème commutable + correctif d'export en
+- **Dernière version** : **1.1.2** (2026-10-07) — édition des actions avant restauration
+  (programme, arguments et dossier de démarrage modifiables dans le plan d'import).
+  Avant elle : **1.1.1** (2026-10-06) — sortie déterministe à la fermeture (processus
+  fantôme sur Server 2016/2019) + purge des fichiers de travail secret ; **1.1.0**
+  (2026-09-22) — thème commutable + correctif d'export en
   archive, et **1.0.0** (2026-09-12), première version publiée ; les numérotations
   intermédiaires (1.1.0 du 2026-09-10) ont été **renumérotées en 1.0.0** lors de la création du
   dépôt (les entrées de dates ci-dessous gardent leur numérotation d'origine — l'entrée
@@ -130,6 +132,18 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
   sérialisation), 4 dans `import.rs` (écriture, reclassification, identité, erreur) et 2
   côté `src-tauri` (roundtrip answer-file, import élevé).
 
+- **2026-10-07 (release 1.1.2)** — **Publication de l'édition des actions** : version
+  unifiée **1.1.2** dans les trois fichiers canoniques (`Cargo.lock` synchronisés pour la
+  CI `--locked`), entrée CHANGELOG 1.1.2, guide remis à jour (chip « 🆕 Version 1.1.2 »,
+  pied de page) + mémo, README FR/EN et AGENTS alignés, PDF régénérés et empreintes de
+  sources mises à jour. Binaires release reconstruits (CLI : `tsbak 1.1.2` confirmé ;
+  interface : `FileVersion` 1.1.2 avec l'UI embarquée du bouton d'édition) et recopiés
+  dans `dist/` ; livrable assemblé par `tools/make-release.ps1` (dossier +
+  `tsbak-1.1.2-windows.zip`, 49 fichiers, empreintes : interface `ba350230…`, CLI
+  `a58a7746…`, zip `ccd88c1e…`). **Publication** : `v1.1.2` poussé (commit release
+  `6bf5b73`, fonctionnalité `f4b70cc`) + release GitHub « Task Backup and Restore 1.1.2 »
+  avec le zip (4 859 220 octets) ; CI et Guide PDF verts sur le commit de release.
+
 ## Décisions structurantes
 
 1. **Le CLI est le moteur** : `tsbak.exe` fonctionne sur **toutes** les versions de
@@ -234,6 +248,10 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
 - [x] **Release 1.1.1** publiée le 2026-10-06 (`v1.1.1` + `tsbak-1.1.1-windows.zip`) : fermeture
       déterministe (bug Server 2016/2019), purge des secrets transitoires, ménage, CI `cargo test`
       verte (y compris après correction du test de staging).
+- [x] **Release 1.1.2** publiée le 2026-10-07 (`v1.1.2` + `tsbak-1.1.2-windows.zip`,
+      49 fichiers) : édition des actions avant restauration (moteur `action.rs`, bouton
+      « Modifier l'action… », `action_overrides`), CHANGELOG/guides/README alignés,
+      binaires reconstruits, CI verte.
 - [ ] **`cargo fmt`** : le dépôt n'a jamais été formaté (diffs rustfmt massifs partout) — à faire
       dans un commit dédié, sans mélanger avec d'autres sujets, puis ajouter `cargo fmt --check`
       à `ci.yml` (ne pas l'activer avant). `clippy` est déjà propre hors remarques de style.
