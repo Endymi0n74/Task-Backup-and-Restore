@@ -213,6 +213,9 @@ const decisions = {
   conflicts: {}, // chemin -> "overwrite" | "skip"
   userMap: {}, // source -> cible
   skipTasks: [], // chemins (sérialisé depuis un Set)
+  // Surcharges d'action par chemin : seuls les champs renseignés de la
+  // première action (commande / arguments / dossier) sont réécrits.
+  actionOverrides: {},
 };
 const skipSet = new Set();
 // Champs « mot de passe requis » par tâche (chemin -> input), remplis en bloc
@@ -353,7 +356,7 @@ async function loadPlan() {
   const dir = await resolveDir();
   if (!dir) {
     setStatus("Indiquez d'abord le dossier d'archive.", "error");
-    return;
+    return false;
   }
   try {
     setStatus("Construction du plan…");
@@ -366,8 +369,10 @@ async function loadPlan() {
     $("plan-card").classList.remove("hidden");
     $("report-card").classList.add("hidden");
     setStatus(`Plan établi : ${plan.length} tâche(s).`, "success");
+    return true;
   } catch (e) {
     showError(e);
+    return false;
   }
 }
 
@@ -382,7 +387,11 @@ function actionBadge(item) {
     user_unmapped: ["badge-unmapped", "Utilisateur non mappé"],
   };
   const [cls, label] = map[item.actionKind] || ["badge-skip", item.actionLabel];
-  return `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
+  let html = `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
+  if (decisions.actionOverrides[item.path]) {
+    html += ` <span class="badge badge-edited" title="Programme / arguments / dossier de démarrage modifiés avant import">Action modifiée</span>`;
+  }
+  return html;
 }
 
 function renderPlan() {
@@ -422,9 +431,11 @@ function renderPlan() {
     }
   }
 
-  $("plan-note").textContent = folder
-    ? `Restauration sous « ${folder} » (structure d'origine préservée). Résolvez chaque tâche puis « Re-planifier » pour actualiser le plan.`
-    : "Résolvez chaque tâche puis « Re-planifier » pour actualiser le plan.";
+  $("plan-note").textContent =
+    (folder
+      ? `Restauration sous « ${folder} » (structure d'origine préservée). Résolvez chaque tâche puis « Re-planifier » pour actualiser le plan.`
+      : "Résolvez chaque tâche puis « Re-planifier » pour actualiser le plan.") +
+    " « Modifier l'action… » adapte le programme, les arguments et le dossier de démarrage d'une tâche (chemins propres à la machine source).";
   $("plan-count").textContent = `${plan.length} tâche(s) — ${pending} à résoudre.`;
   $("btn-fill-same-password").disabled = !plan.some((i) => i.actionKind === "password_required");
 }
@@ -527,7 +538,141 @@ function buildResolutionControls(item) {
     default:
       wrap.appendChild(document.createTextNode("—"));
   }
+  addActionEditControl(item, wrap);
   return wrap;
+}
+
+// ---------------------------------------------------------------------------
+// Onglet Import — édition de l'action d'une tâche
+// ---------------------------------------------------------------------------
+
+/// Contrôle « Modifier l'action… » : ajouté à chaque ligne dont la tâche
+/// possède au moins une action Exécutable (`actionCount > 0`).
+function addActionEditControl(item, wrap) {
+  if (item.actionCount > 0) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-mini";
+    btn.textContent = decisions.actionOverrides[item.path]
+      ? "Modifier l'action (active)…"
+      : "Modifier l'action…";
+    btn.title =
+      "Programme/script, arguments et dossier de démarrage de la première action (repère les chemins propres à la machine source)";
+    btn.addEventListener("click", () => openActionEditor(item, wrap));
+    wrap.appendChild(btn);
+  } else {
+    const hint = document.createElement("span");
+    hint.className = "muted";
+    hint.textContent = "Action non modifiable (aucune action « Exécuter »)";
+    wrap.appendChild(hint);
+  }
+}
+
+/// Formulaire d'édition inline des trois champs de la première action.
+/// « Appliquer » ne modifie que la décision locale, puis relance le plan :
+/// c'est le backend (`build_plan`) qui réécrit le XML, exactement de la
+/// même façon en simulation, en import réel et via le processus élevé.
+function openActionEditor(item, wrap) {
+  if (wrap.querySelector(".action-editor")) return;
+
+  const current = {
+    command: item.actionCommand || "",
+    arguments: item.actionArguments || "",
+    workingDirectory: item.actionWorkingDirectory || "",
+  };
+
+  const editor = document.createElement("div");
+  editor.className = "action-editor";
+
+  const addField = (labelText, value, placeholder) => {
+    const label = document.createElement("label");
+    label.appendChild(document.createTextNode(labelText));
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = value;
+    if (placeholder) input.placeholder = placeholder;
+    label.appendChild(input);
+    editor.appendChild(label);
+    return input;
+  };
+
+  const inCommand = addField("Programme/script", current.command, "ex. D:\\Scripts\\job.exe");
+  const inArguments = addField("Ajouter des arguments", current.arguments, "ex. --serveur SRV01");
+  const inWorkingDir = addField(
+    "Commencer dans",
+    current.workingDirectory,
+    "ex. D:\\Scripts (laisser vide pour vider le champ)"
+  );
+
+  if (item.actionCount > 1) {
+    const note = document.createElement("span");
+    note.className = "action-editor-note";
+    note.textContent = `Cette tâche compte ${item.actionCount} actions : seule la première (« Exécuter ») est modifiable.`;
+    editor.appendChild(note);
+  }
+
+  const buttons = document.createElement("div");
+  buttons.className = "action-editor-buttons";
+  const mkButton = (text, cls) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = cls ? `btn ${cls}` : "btn";
+    btn.textContent = text;
+    buttons.appendChild(btn);
+    return btn;
+  };
+
+  const applyBtn = mkButton("Appliquer et re-planifier", "btn-primary");
+  const cancelBtn = mkButton("Annuler");
+  const resetBtn = decisions.actionOverrides[item.path]
+    ? mkButton("Rétablir l'action d'origine")
+    : null;
+
+  applyBtn.addEventListener("click", async () => {
+    // Seuls les champs dont la valeur change sont transmis : `null`/absent
+    // signifie « inchangé » pour le moteur, ce qui limite la réécriture du
+    // XML au strict nécessaire.
+    const override = {};
+    const collect = (key, input, previous) => {
+      const value = input.value.trim();
+      if (value !== previous.trim()) override[key] = value;
+    };
+    collect("command", inCommand, current.command);
+    collect("arguments", inArguments, current.arguments);
+    collect("workingDirectory", inWorkingDir, current.workingDirectory);
+
+    const changed = Object.keys(override).length > 0;
+    if (changed) {
+      decisions.actionOverrides[item.path] = override;
+    } else {
+      delete decisions.actionOverrides[item.path];
+    }
+    const ok = await loadPlan();
+    if (ok) {
+      setStatus(
+        changed
+          ? `Action de « ${item.path} » modifiée — plan actualisé.`
+          : `Action de « ${item.path} » inchangée.`,
+        "success"
+      );
+    }
+  });
+
+  cancelBtn.addEventListener("click", () => editor.remove());
+
+  if (resetBtn) {
+    resetBtn.addEventListener("click", async () => {
+      delete decisions.actionOverrides[item.path];
+      const ok = await loadPlan();
+      if (ok) {
+        setStatus(`Action de « ${item.path} » rétablie telle qu'exportée — plan actualisé.`, "success");
+      }
+    });
+  }
+
+  editor.appendChild(buttons);
+  wrap.appendChild(editor);
+  inCommand.focus();
 }
 
 // ---------------------------------------------------------------------------

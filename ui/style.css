@@ -213,6 +213,31 @@ tbody tr:last-child td { border-bottom: none; }
 .resolve input[type="text"] { width: 220px; }
 .resolve input[type="password"] { width: 200px; }
 
+/* ---------- Édition de l'action d'une tâche ---------- */
+.btn-mini { padding: 3px 9px; font-size: 12px; }
+.badge-edited { background: #fff3bf; color: #99581a; }
+
+.action-editor {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+  background: #fbfcfe;
+}
+.action-editor label {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  color: var(--muted);
+  gap: 2px;
+}
+.action-editor input[type="text"] { width: 100%; box-sizing: border-box; }
+.action-editor-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.action-editor-note { font-size: 11px; color: var(--muted); }
+
 /* ---------- Résumés et rapports ---------- */
 .summary {
   border: 1px solid #bfe3c4;

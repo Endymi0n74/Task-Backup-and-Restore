@@ -3,6 +3,7 @@
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
+pub mod action;
 pub mod answers;
 pub mod error;
 pub mod export;

@@ -51,6 +51,10 @@ bugs réels ont été trouvés et corrigés à cette occasion :
 - `src/import.rs` : `load_and_verify` (verification des empreintes SHA-256 +
   bonne formation XML), `build_plan` (classification identique pour
   dry-run et execution reelle), `execute_plan` (ecriture ou simulation).
+- `src/action.rs` : lecture (`read_action`) et reecriture (`apply_action`)
+  de la premiere action `Exec` d'un XML de tache — programme, arguments,
+  dossier de demarrage — appliquee par `build_plan` avant toute comparaison,
+  donc identique en simulation, en execution reelle et via le helper eleve.
 - `src/password.rs` : resolution des mots de passe (fichier, fichier de
   reponses, invite masquee), jamais journalises.
 - `src/answers.rs` : format du fichier de reponses JSON pour un import
@@ -91,9 +95,25 @@ bugs réels ont été trouvés et corrigés à cette occasion :
   "user_map": { "OLDPC\\bob": "NEWPC\\bob" },
   "passwords": { "NEWPC\\bob": "motdepasse" },
   "conflict_decisions": { "\\MonDossier\\MaTache": "overwrite" },
-  "skip_tasks": ["\\Autre\\TacheASauter"]
+  "skip_tasks": ["\\Autre\\TacheASauter"],
+  "action_overrides": {
+    "\\MonDossier\\MaTache": {
+      "command": "D:\\Scripts\\job.exe",
+      "arguments": "--serveur SRV01",
+      "workingDirectory": "D:\\Scripts"
+    }
+  }
 }
 ```
+
+`action_overrides` reecrit les champs d'action (premiere action `Exec`)
+juste avant l'ecriture : utile quand les chemins changent d'une machine a
+l'autre (lettres de lecteur, partages UNC). Cles en `camelCase`, seuls les
+champs presents sont modifies (`"arguments": ""` vide le champ, un champ
+absent du XML est cree a sa place dans la sequence du schema) ; une tache
+sans action `Exec` fait echouer le plan avec un message clair. La meme
+structure est utilisee par l'interface (« Modifier l'action… » dans le
+plan d'import).
 
 ## Format du fichier de mots de passe (`--password-file`)
 

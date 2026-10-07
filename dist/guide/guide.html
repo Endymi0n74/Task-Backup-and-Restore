@@ -137,6 +137,7 @@
   .b-orange { background: #ffe8cc; color: #c06908; }
   .b-red { background: #ffe3e3; color: #c92a2a; }
   .b-purple { background: #f3d9fa; color: #9c36b5; }
+  .b-yellow { background: #fff3bf; color: #99581a; }
 
   .newpage { page-break-before: always; }
   .footer-note { margin-top: 18px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
@@ -413,6 +414,21 @@
   <strong>Sécurité :</strong> le mot de passe unique emprunte exactement le <strong>même chemin</strong> que la saisie ligne par ligne (commande <code>import_set_password</code>) : le secret reste en <strong>mémoire du processus Rust</strong>, n'est <strong>jamais journalisé</strong> ni écrit sur disque, et n'est transmis au processus d'import élevé que par le fichier temporaire d'élévation, supprimé ensuite (les fichiers de travail sont en plus purgés à chaque démarrage et à la fermeture). Le bouton « Remplir avec le même mot de passe » n'est actif que si le plan contient une ligne concernée. En ligne de commande, l'équivalent est <code>--password-file mdp.txt</code> (un mot de passe par utilisateur).
 </div>
 
+<h3>4.2. Modifier l'action d'une tâche avant l'import</h3>
+
+<p>Une tâche sauvegardée conserve les chemins de la machine source : lettre de lecteur locale, partage UNC, chemin d'un script qui n'existe pas tel quel sur la cible. Plutôt que de restaurer un chemin inutilisable, chaque ligne du plan dont la tâche possède une action <strong>Exécuter</strong> propose un bouton <strong>« Modifier l'action… »</strong>.</p>
+
+<ol class="steps">
+  <li>Cliquer <strong>« Modifier l'action… »</strong> dans la colonne <em>Résolution</em> : un formulaire s'ouvre sous la ligne, pré-rempli avec les valeurs en vigueur — <em>Programme/script</em>, <em>Ajouter des arguments</em>, <em>Commencer dans</em>.</li>
+  <li>Modifier uniquement les champs concernés : un champ vidé est bien vidé dans le XML, un champ absent du XML est créé à sa place, les autres restent strictement inchangés. Si la tâche compte plusieurs actions, le formulaire le signale — seule la première est modifiable.</li>
+  <li><strong>« Appliquer et re-planifier »</strong> : la décision est enregistrée et le plan se recalcule ; la ligne affiche alors le badge <span class="badge b-yellow">Action modifiée</span>. Le bouton <strong>« Rétablir l'action d'origine »</strong> retire la modification.</li>
+  <li>Terminer par <strong>« Simuler (dry-run) »</strong> puis <strong>« Importer »</strong>, comme d'habitude.</li>
+</ol>
+
+<div class="callout info">
+  <strong>Moteur :</strong> l'édition est appliquée <strong>une seule fois</strong>, à la construction du plan : la simulation, l'import réel et le processus élevé voient donc exactement le même XML, et <strong>l'archive d'origine n'est jamais modifiée</strong>. Une tâche dont le programme change passe logiquement de « Identique » à « Mettre à jour ». En ligne de commande, l'équivalent est le champ <code>action_overrides</code> du fichier de réponses (section 8).
+</div>
+
 <!-- ================= 5. LOGS ================= -->
 <h2 class="section">5. Consulter les journaux (onglet Logs)</h2>
 
@@ -612,7 +628,7 @@ tsbak.exe import D:\sauvegardes\export-2026-10-07 --yes --answer-file reponses.j
 tsbak.exe import D:\sauvegardes\export-2026-10-07 --interactive</code></pre>
 
 <div class="callout info">
-  <strong>Automatisation :</strong> la ligne de commande se planifie elle-même (ex. <code>schtasks /create /sc weekly /tn "tsbak-import" /tr "D:\tsbak\import.cmd" /ru SYSTEM</code>) pour restaurer périodiquement des sauvegardes sur un serveur de secours. En mode non interactif, prévoir <code>--yes</code>, <code>--conflict-policy</code>, <code>--user-map</code> et <code>--password-file</code> pour que rien ne reste bloqué.
+  <strong>Automatisation :</strong> la ligne de commande se planifie elle-même (ex. <code>schtasks /create /sc weekly /tn "tsbak-import" /tr "D:\tsbak\import.cmd" /ru SYSTEM</code>) pour restaurer périodiquement des sauvegardes sur un serveur de secours. En mode non interactif, prévoir <code>--yes</code>, <code>--conflict-policy</code>, <code>--user-map</code> et <code>--password-file</code> pour que rien ne reste bloqué. Le fichier de réponses accepte aussi <code>action_overrides</code> (programme, arguments et dossier de démarrage réécrits avant import — voir 4.2).
 </div>
 
 <!-- ================= 9. SECURITE ================= -->
@@ -639,6 +655,7 @@ tsbak.exe import D:\sauvegardes\export-2026-10-07 --interactive</code></pre>
   <tr><td>Archive .zip chiffrée illisible</td><td>Vérifier le mot de passe ; le format AES-256 est standard (7-Zip/WinZip le lisent).</td></tr>
   <tr><td>« Échec » à l'import réel</td><td>Lancer en administrateur (UAC) ; consulter <code>%LOCALAPPDATA%\tsbak\logs\</code> pour le détail.</td></tr>
   <tr><td>Conflit : la tâche existe déjà et diffère</td><td>GUI : choisir « Mettre à jour » ou « Conserver l'existante » dans la colonne <em>Résolution</em> ; CLI : <code>--conflict-policy overwrite|skip</code> ; ou restaurer sous un <code>--folder</code> dédié.</td></tr>
+  <tr><td>Tâche restaurée mais le script ne se lance pas (chemin introuvable)</td><td>Les chemins pointent encore vers la machine source (lecteur absent, partage UNC) → <strong>« Modifier l'action… »</strong> de la ligne concernée avant l'import (4.2), ou <code>action_overrides</code> du fichier de réponses en CLI.</td></tr>
 </table>
 
 <div class="footer-note">

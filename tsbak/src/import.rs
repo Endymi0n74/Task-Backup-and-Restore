@@ -158,26 +158,41 @@ pub fn build_plan(
 ) -> Result<Vec<PlanItem>> {
     let empty_conflicts = HashMap::new();
     let empty_skips: Vec<String> = Vec::new();
-    let (answer_user_map, answer_passwords_users, answer_conflicts, answer_skips): (
+    let empty_overrides: HashMap<String, crate::action::ActionOverride> = HashMap::new();
+    let (
+        answer_user_map,
+        answer_passwords_users,
+        answer_conflicts,
+        answer_skips,
+        answer_overrides,
+    ): (
         HashMap<String, String>,
         Vec<String>,
         &HashMap<String, crate::answers::ConflictDecision>,
         &Vec<String>,
+        &HashMap<String, crate::action::ActionOverride>,
     ) = match options.answers {
         Some(a) => (
             a.user_map.clone(),
             a.passwords.keys().cloned().collect(),
             &a.conflict_decisions,
             &a.skip_tasks,
+            &a.action_overrides,
         ),
-        None => (HashMap::new(), Vec::new(), &empty_conflicts, &empty_skips),
+        None => (
+            HashMap::new(),
+            Vec::new(),
+            &empty_conflicts,
+            &empty_skips,
+            &empty_overrides,
+        ),
     };
     let _ = answer_passwords_users; // le contenu des mots de passe est deja fusionne dans `resolver`
 
     let mut plan = Vec::new();
 
     for record in &manifest.tasks {
-        let xml = xmls
+        let mut xml = xmls
             .get(&record.path)
             .ok_or_else(|| TsbakError::Other(format!("XML manquant pour '{}'", record.path)))?
             .clone();
@@ -197,12 +212,22 @@ pub fn build_plan(
             }};
         }
 
-        // 1. Choix explicite de saut (answer-file), prioritaire sur tout le reste.
+        // 1. Choix explicite de saut (answer-file), prioritaire sur tout le
+        // reste — y compris sur les surcharges d'action : une tache sautee
+        // n'est jamais reecrite, son XML ne doit donc pas etre touche.
         if answer_skips.iter().any(|p| p == &record.path) {
             push_and_continue!(ImportAction::SkippedByChoice);
         }
 
-        // 2. Existence / conflit : determine s'il y a quoi que ce soit a
+        // 2. Surcharge d'action (programme / arguments / dossier de
+        // demarrage) : appliquee ici, une seule fois, avant toute
+        // comparaison — le plan reflete exactement ce qui sera ecrit, en
+        // simulation comme en execution reelle (interface ou helper eleve).
+        if let Some(overrides) = answer_overrides.get(&record.path) {
+            xml = crate::action::apply_action(&xml, &record.path, overrides)?;
+        }
+
+        // 3. Existence / conflit : determine s'il y a quoi que ce soit a
         // ecrire. Les verifications portent sur le chemin **cible** (les
         // decisions de l'utilisateur, elles, restent clees par le chemin
         // d'origine de l'archive). On ne demande mapping ou mot de passe que
@@ -230,7 +255,7 @@ pub fn build_plan(
             }
         };
 
-        // 3. Resolution de l'utilisateur cible, uniquement pour les logon
+        // 4. Resolution de l'utilisateur cible, uniquement pour les logon
         // types qui n'ont aucune autre occasion de detecter un compte absent.
         let mut target_user = record.user_id.clone();
         if let Some(source_user) = record.user_id.clone() {
@@ -249,7 +274,7 @@ pub fn build_plan(
             }
         }
 
-        // 4. Resolution du mot de passe si le logon type en necessite un.
+        // 5. Resolution du mot de passe si le logon type en necessite un.
         let mut password = None;
         if record.requires_password() {
             let user_for_pw = target_user.clone().unwrap_or_default();
@@ -355,6 +380,7 @@ pub fn execute_plan(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::action::ActionOverride;
     use crate::model::{LogonType, TaskRecord};
     use crate::scheduler::mock::{MockScheduler, MockTask};
     use crate::wizard::NullInteractor;
@@ -742,6 +768,178 @@ mod tests {
         let report = execute_plan(&scheduler, &plan, false).unwrap();
         assert_eq!(report.skipped, vec!["\\Restore\\A\\Same".to_string()]);
         assert_eq!(scheduler.registration_count(), 0);
+    }
+
+    #[test]
+    fn action_override_reecrit_le_xml_du_plan_et_de_l_ecriture() {
+        let xml = r#"<Task><Actions><Exec><Command>a.exe</Command></Exec></Actions></Task>"#;
+        let (r, xml_owned) = record("\\A\\Job", LogonType::None, None, xml);
+        let (manifest, xmls) = manifest_and_xmls(vec![(r, xml_owned)]);
+        let scheduler = MockScheduler::new(true);
+        let resolver = PasswordResolver::new(None, None, false);
+
+        let mut answers = AnswerFile::default();
+        answers.action_overrides.insert(
+            "\\A\\Job".to_string(),
+            ActionOverride {
+                command: Some(r"D:\Scripts\a.exe".to_string()),
+                ..Default::default()
+            },
+        );
+        let options = ImportOptions {
+            conflict_policy: None,
+            skip_password_tasks: false,
+            user_map: HashMap::new(),
+            answers: Some(&answers),
+            target_folder: None,
+        };
+        let plan = build_plan(&scheduler, &manifest, &xmls, &options, &resolver, &NullInteractor).unwrap();
+        assert_eq!(plan[0].action, ImportAction::Create);
+        assert!(
+            plan[0].xml.contains(r"<Command>D:\Scripts\a.exe</Command>"),
+            "le plan porte le XML modifie: {}",
+            plan[0].xml
+        );
+
+        let report = execute_plan(&scheduler, &plan, false).unwrap();
+        assert_eq!(report.exit_code(), 0);
+        let written = scheduler.get_task_xml("\\A\\Job").unwrap();
+        assert!(written.contains(r"D:\Scripts\a.exe"), "ecriture avec la surcharge");
+        assert!(!written.contains("<Command>a.exe"), "l'ancien programme ne subsiste pas");
+    }
+
+    #[test]
+    fn action_override_rend_la_tache_existante_differente() {
+        // La tache existante est identique a l'archive : sans surcharge,
+        // rien a faire ; avec surcharge, le XML effectif differe desormais.
+        let xml = r#"<Task><Actions><Exec><Command>a.exe</Command></Exec></Actions></Task>"#;
+        let (r, xml_owned) = record("\\A\\Job", LogonType::None, None, xml);
+        let (manifest, xmls) = manifest_and_xmls(vec![(r, xml_owned)]);
+        let scheduler = MockScheduler::new(true).with_task(
+            "\\A\\Job",
+            MockTask {
+                xml: xml.to_string(),
+                user_id: None,
+                logon_type: LogonType::None,
+            },
+        );
+        let resolver = PasswordResolver::new(None, None, false);
+
+        let sans = ImportOptions {
+            conflict_policy: None,
+            skip_password_tasks: false,
+            user_map: HashMap::new(),
+            answers: None,
+            target_folder: None,
+        };
+        let plan = build_plan(&scheduler, &manifest, &xmls, &sans, &resolver, &NullInteractor).unwrap();
+        assert_eq!(plan[0].action, ImportAction::SkipIdentical);
+
+        let mut answers = AnswerFile::default();
+        answers.action_overrides.insert(
+            "\\A\\Job".to_string(),
+            ActionOverride {
+                command: Some("new.exe".to_string()),
+                ..Default::default()
+            },
+        );
+        let avec = ImportOptions {
+            conflict_policy: None,
+            skip_password_tasks: false,
+            user_map: HashMap::new(),
+            answers: Some(&answers),
+            target_folder: None,
+        };
+        let plan = build_plan(&scheduler, &manifest, &xmls, &avec, &resolver, &NullInteractor).unwrap();
+        assert_eq!(
+            plan[0].action,
+            ImportAction::Conflict,
+            "le XML modifie n'est plus identique a l'existant"
+        );
+
+        let ecrase = ImportOptions {
+            conflict_policy: Some(ConflictPolicy::Overwrite),
+            skip_password_tasks: false,
+            user_map: HashMap::new(),
+            answers: Some(&answers),
+            target_folder: None,
+        };
+        let plan = build_plan(&scheduler, &manifest, &xmls, &ecrase, &resolver, &NullInteractor).unwrap();
+        assert_eq!(plan[0].action, ImportAction::Update);
+        let report = execute_plan(&scheduler, &plan, false).unwrap();
+        assert_eq!(report.updated, vec!["\\A\\Job".to_string()]);
+    }
+
+    #[test]
+    fn action_override_identique_a_l_existante_est_classee_identique() {
+        // Cas inverse : l'existant correspond deja au XML modifie (tache
+        // configuree sur la cible avec les nouveaux chemins).
+        let original = r#"<Task><Actions><Exec><Command>old</Command></Exec></Actions></Task>"#;
+        let (r, xml_owned) = record("\\A\\Job", LogonType::None, None, original);
+        let (manifest, xmls) = manifest_and_xmls(vec![(r, xml_owned)]);
+        let scheduler = MockScheduler::new(true).with_task(
+            "\\A\\Job",
+            MockTask {
+                xml: r#"<Task><Actions><Exec><Command>new</Command></Exec></Actions></Task>"#
+                    .to_string(),
+                user_id: None,
+                logon_type: LogonType::None,
+            },
+        );
+        let resolver = PasswordResolver::new(None, None, false);
+
+        let mut answers = AnswerFile::default();
+        answers.action_overrides.insert(
+            "\\A\\Job".to_string(),
+            ActionOverride {
+                command: Some("new".to_string()),
+                ..Default::default()
+            },
+        );
+        let options = ImportOptions {
+            conflict_policy: None,
+            skip_password_tasks: false,
+            user_map: HashMap::new(),
+            answers: Some(&answers),
+            target_folder: None,
+        };
+        let plan = build_plan(&scheduler, &manifest, &xmls, &options, &resolver, &NullInteractor).unwrap();
+        assert_eq!(plan[0].action, ImportAction::SkipIdentical);
+    }
+
+    #[test]
+    fn action_override_sans_action_exec_fait_echouer_le_plan() {
+        let xml = r#"<Task><Actions><ComHandler><Command>{c}</Command></ComHandler></Actions></Task>"#;
+        let (r, xml_owned) = record("\\A\\Job", LogonType::None, None, xml);
+        let (manifest, xmls) = manifest_and_xmls(vec![(r, xml_owned)]);
+        let scheduler = MockScheduler::new(true);
+        let resolver = PasswordResolver::new(None, None, false);
+
+        let mut answers = AnswerFile::default();
+        answers.action_overrides.insert(
+            "\\A\\Job".to_string(),
+            ActionOverride {
+                command: Some("job.exe".to_string()),
+                ..Default::default()
+            },
+        );
+        let options = ImportOptions {
+            conflict_policy: None,
+            skip_password_tasks: false,
+            user_map: HashMap::new(),
+            answers: Some(&answers),
+            target_folder: None,
+        };
+        // Pas de `unwrap_err()` ici : `PlanItem` ne derive volontairement
+        // pas `Debug` (il peut porter un mot de passe).
+        let err = match build_plan(&scheduler, &manifest, &xmls, &options, &resolver, &NullInteractor) {
+            Err(e) => e,
+            Ok(_) => panic!("le plan doit echouer sur une surcharge sans action Exec"),
+        };
+        assert!(
+            err.to_string().contains("aucune action Exec"),
+            "message clair: {err}"
+        );
     }
 
     #[test]

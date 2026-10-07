@@ -8,6 +8,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::action::ActionOverride;
 use crate::error::{Result, TsbakError};
 use crate::model::ConflictPolicy;
 
@@ -27,6 +28,11 @@ pub struct AnswerFile {
     /// Taches a sauter explicitement (chemin complet), quelle que soit leur classification.
     #[serde(default)]
     pub skip_tasks: Vec<String>,
+    /// Surcharges d'action par chemin de tache : seuls les champs
+    /// renseignes de la premiere action `Exec` (programme, arguments,
+    /// dossier de demarrage) sont reecrits avant l'ecriture.
+    #[serde(default)]
+    pub action_overrides: HashMap<String, ActionOverride>,
 }
 
 /// Decision de resolution d'un conflit pour une tache donnee, telle que
@@ -115,5 +121,30 @@ mod tests {
         assert!(is_well_known_account("SYSTEM"));
         assert!(is_well_known_account("NT AUTHORITY\\SYSTEM"));
         assert!(!is_well_known_account("DOMAIN\\alice"));
+    }
+
+    #[test]
+    fn action_overrides_lues_en_camel_case_et_champs_optionnels() {
+        let json = r#"{
+            "action_overrides": {
+                "\\Backup\\Nightly": {
+                    "command": "D:\\Scripts\\job.exe",
+                    "workingDirectory": "D:\\Scripts"
+                }
+            }
+        }"#;
+        let answers: AnswerFile = serde_json::from_str(json).unwrap();
+        let o = answers
+            .action_overrides
+            .get("\\Backup\\Nightly")
+            .expect("surcharge lue");
+        assert_eq!(o.command.as_deref(), Some(r"D:\Scripts\job.exe"));
+        assert_eq!(o.working_directory.as_deref(), Some(r"D:\Scripts"));
+        assert_eq!(o.arguments, None, "champ absent = champ inchange");
+        assert!(!o.is_empty());
+
+        // Une charge sans surcharge reste valide (compatibilite anciens fichiers).
+        let plain: AnswerFile = serde_json::from_str(r#"{"skip_tasks": []}"#).unwrap();
+        assert!(plain.action_overrides.is_empty());
     }
 }

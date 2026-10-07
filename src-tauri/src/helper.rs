@@ -479,6 +479,14 @@ mod tests {
         decisions.conflicts.insert("\\A".to_string(), "overwrite".to_string());
         decisions.user_map.insert("OLDPC\\bob".to_string(), "NEWPC\\bob".to_string());
         decisions.skip_tasks.push("\\SkipMe".to_string());
+        decisions.action_overrides.insert(
+            "\\Backup\\Nightly".to_string(),
+            tsbak::action::ActionOverride {
+                command: Some("D:\\Scripts\\a.exe".to_string()),
+                working_directory: Some("D:\\Scripts".to_string()),
+                arguments: None,
+            },
+        );
         let mut passwords = HashMap::new();
         passwords.insert("NEWPC\\bob".to_string(), "m0t de passe".to_string());
 
@@ -491,6 +499,12 @@ mod tests {
         ));
         assert_eq!(answers.user_map.get("OLDPC\\bob").map(String::as_str), Some("NEWPC\\bob"));
         assert!(answers.skip_tasks.contains(&"\\SkipMe".to_string()));
+        let override_ = answers
+            .action_overrides
+            .get("\\Backup\\Nightly")
+            .expect("surcharge d'action transportée");
+        assert_eq!(override_.command.as_deref(), Some("D:\\Scripts\\a.exe"));
+        assert_eq!(override_.arguments, None);
 
         // Sérialisation → rechargement (roundtrip avec AnswerFile::load).
         let dir = tempfile::tempdir().unwrap();
@@ -498,6 +512,39 @@ mod tests {
         write_json(&path, &answers).unwrap();
         let loaded = AnswerFile::load(&path).unwrap();
         assert_eq!(loaded.passwords.get("NEWPC\\bob").map(String::as_str), Some("m0t de passe"));
+        assert_eq!(
+            loaded.action_overrides.get("\\Backup\\Nightly").and_then(|o| o.command.as_deref()),
+            Some("D:\\Scripts\\a.exe"),
+            "les surcharges d'action survivent au passage par le fichier de réponses"
+        );
+    }
+
+    #[test]
+    fn helper_applique_les_surcharges_daction() {
+        let log_dir = tempfile::tempdir().unwrap();
+        let log = AppLog::with_dir(log_dir.path().to_path_buf());
+        let archive = tempfile::tempdir().unwrap();
+        make_archive(archive.path());
+
+        let mut answers = AnswerFile::default();
+        answers.passwords.insert("DOMAIN\\alice".to_string(), "s3cret".to_string());
+        answers.action_overrides.insert(
+            "\\Backup\\Nightly".to_string(),
+            tsbak::action::ActionOverride {
+                command: Some("D:\\Scripts\\a.exe".to_string()),
+                ..Default::default()
+            },
+        );
+
+        let target = MockScheduler::new(true);
+        let report = helper_import_with(&log, &target, archive.path(), &answers, false, None).unwrap();
+        assert_eq!(report.created.len(), 2);
+        let written = target.get_task_xml("\\Backup\\Nightly").unwrap();
+        assert!(written.contains("D:\\Scripts\\a.exe"), "le helper écrit le XML modifié: {written}");
+        assert!(!written.contains("<Command>a.exe</Command>"));
+        // L'autre tâche, sans surcharge, est écrite à l'identique.
+        let other = target.get_task_xml("\\Backup\\Weekly").unwrap();
+        assert!(other.contains("<Command>b.exe</Command>"));
     }
 
     #[test]

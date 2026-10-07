@@ -33,7 +33,9 @@ vérification d'intégrité et les mêmes journaux.
 - **Import** : dossier d'export **ou** archive `.zip` (détectée, extraite et validée
   automatiquement — protection zip-slip incluse), plan d'import résolu tâche par tâche
   (créer / mettre à jour / ignorer / conflit / utilisateur non mappé / mot de passe requis),
-  **simulation (dry-run)** puis import réel.
+  **édition des actions avant restauration** — *Programme/script*, *Ajouter des arguments*,
+  *Commencer dans* modifiables tâche par tâche (chemins propres à la machine source :
+  lettres de lecteur, partages UNC), **simulation (dry-run)** puis import réel.
 - **Élévation sans redémarrage** : l'import réel s'exécute dans un **processus enfant élevé**
   temporaire (invite UAC), l'interface reste ouverte et affiche le rapport à la fin.
 - **Journalisation** : logs horodatés dans `%LOCALAPPDATA%\tsbak\logs\` (rétention 14 jours),
@@ -66,7 +68,9 @@ inclus : **[`dist/Guide-tsbak.pdf`](dist/Guide-tsbak.pdf)**
 - export avec l'interface graphique, captures annotées pas à pas (section 2) ;
 - fonctionnement des filtres *Inclure / Exclure* et combinaison avec les cases à cocher (section 3) ;
 - import avec l'interface graphique (section 4), dont le **mot de passe unique** (4.1) : un seul
-  secret appliqué à toutes les tâches « Mot de passe requis » ;
+  secret appliqué à toutes les tâches « Mot de passe requis », et l'**édition des actions** (4.2) :
+  *Programme/script*, *arguments* et *dossier de démarrage* ajustables tâche par tâche avant
+  l'import (chemins propres à la machine source) ;
 - onglet *Logs* : le journal du jour en temps réel (section 5) ;
 - ligne de commande : `list` / `export` / `validate` / `import` (section 6) ;
 - assistants `.cmd` pour les serveurs 2008 R2 / 2012 (section 7) ;
@@ -232,7 +236,7 @@ cargo test e2e_export_zip_aes_then_reimport -- --ignored --nocapture
 
 | Chemin | Rôle |
 |---|---|
-| `tsbak/` | Crate Rust du moteur + CLI `tsbak.exe` (`scheduler/`, `export.rs`, `import.rs`, `password.rs`, `answers.rs`, `wizard.rs`) |
+| `tsbak/` | Crate Rust du moteur + CLI `tsbak.exe` (`scheduler/`, `export.rs`, `import.rs`, `action.rs`, `password.rs`, `answers.rs`, `wizard.rs`) |
 | `src-tauri/` | Application Tauri 2 : commandes (`commands.rs`), archives ZIP/AES (`archive.rs`), helper d'élévation (`helper.rs`), logs (`app_log.rs`) |
 | `ui/` | Frontend statique HTML/CSS/JS (sans framework) ; palettes dans `ui/themes/` (`legacy` = publié, `hestia` = variante locale) |
 | `dist/` | Livraison : `TaskBackupRestore.exe`, `tsbak.exe`, assistants `.cmd`, `Guide-tsbak.pdf` + `Memo-motifs.pdf` + sources du guide (`guide/`, captures et scripts) |

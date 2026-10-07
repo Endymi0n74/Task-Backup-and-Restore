@@ -33,6 +33,8 @@ integrity check and the same logs.
 - **Import**: export folder **or** `.zip` archive (detected, extracted and validated
   automatically — zip-slip protection included), import plan resolved task by task
   (create / update / skip / conflict / unmapped user / password required),
+  **action editing before restore** — *Program*, *Add arguments*, *Start in* editable
+  per task (paths specific to the source machine: drive letters, UNC shares),
   **simulation (dry-run)** then the real import.
 - **Elevation without restart**: the real import runs in a temporary **elevated child
   process** (UAC prompt), the interface stays open and shows the report at the end.
@@ -66,7 +68,9 @@ is included: **[`dist/Guide-tsbak.pdf`](dist/Guide-tsbak.pdf)**
 - export with the graphical interface, annotated step-by-step screenshots (section 2) ;
 - how the *Inclure / Exclure* filters work and combine with the checkboxes (section 3) ;
 - import with the graphical interface (section 4), including the **single password** (4.1):
-  one secret applied to all "Password required" tasks ;
+  one secret applied to all "Password required" tasks, and **action editing** (4.2):
+  *Program*, *arguments* and *working directory* adjustable per task before the import
+  (paths specific to the source machine) ;
 - *Logs* tab: the day's journal live (section 5) ;
 - command line: `list` / `export` / `validate` / `import` (section 6) ;
 - `.cmd` helpers for 2008 R2 / 2012 servers (section 7) ;
@@ -231,7 +235,7 @@ cargo test e2e_export_zip_aes_then_reimport -- --ignored --nocapture
 
 | Path | Role |
 |---|---|
-| `tsbak/` | Rust crate of the engine + `tsbak.exe` CLI (`scheduler/`, `export.rs`, `import.rs`, `password.rs`, `answers.rs`, `wizard.rs`) |
+| `tsbak/` | Rust crate of the engine + `tsbak.exe` CLI (`scheduler/`, `export.rs`, `import.rs`, `action.rs`, `password.rs`, `answers.rs`, `wizard.rs`) |
 | `src-tauri/` | Tauri 2 application: commands (`commands.rs`), ZIP/AES archives (`archive.rs`), elevation helper (`helper.rs`), logs (`app_log.rs`) |
 | `ui/` | static HTML/CSS/JS frontend (no framework) ; palettes in `ui/themes/` (`legacy` = published, `hestia` = local variant) |
 | `dist/` | Delivery: `TaskBackupRestore.exe`, `tsbak.exe`, `.cmd` helpers, `Guide-tsbak.pdf` + `Memo-motifs.pdf` + guide sources (`guide/`, screenshots and scripts) |

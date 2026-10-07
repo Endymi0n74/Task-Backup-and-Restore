@@ -2,5 +2,5 @@
 # Ne pas editer a la main : modifier les sources, puis
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Build
 # <sha256 des sources>  <PDF livre>
-2246bceee37e777b6f6ef0732cf4ec72aaabc5b0b76083083d70a852a5b70c49  dist/Guide-tsbak.pdf
+2831f58df5f14987760384e6bdbf3eaa474f80abc952c0d4f4b8157124ee3e08  dist/Guide-tsbak.pdf
 c816bed849266bf01470af96f67018d69794190a3ea901a355e9ad88c7b6d89f  dist/Memo-motifs.pdf

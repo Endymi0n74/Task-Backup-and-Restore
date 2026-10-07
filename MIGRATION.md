@@ -213,6 +213,15 @@ C:\tsbak\tsbak.exe import D:\tsbak\export-2026-09-10 --dry-run ^
 > 💡 Les comptes bien connus (SYSTEM, LOCAL SERVICE, NETWORK SERVICE…) ne
 > nécessitent **jamais** de mapping : ils existent identiquement partout.
 
+> 🛣️ **Chemins d'action différents** (lettres de lecteur, partages UNC
+> propres à l'ancienne machine) : le *Programme/script*, les *arguments* et
+> le *dossier de démarrage* de chaque tâche se modifient **avant** l'import
+> — bouton **« Modifier l'action… »** de la ligne concernée dans l'interface
+> (puis re-planification), ou `action_overrides` du fichier de réponses en
+> ligne de commande (voir *Automatisation* plus bas). Seule la première
+> action de la tâche est réécrite ; l'archive d'origine n'est jamais
+> modifiée.
+
 ---
 
 ## Étape 8 — Importer réellement
@@ -269,9 +278,20 @@ Pour planifier la restauration (ex. reprise sur serveur de secours) :
   "user_map": { "SRV-2008R2\\svc_backup": "SRV-2022\\svc_backup" },
   "passwords": { "SRV-2022\\svc_backup": "MonM0tDeP@sse" },
   "conflict_decisions": { "\\Ancien\\Planif": "overwrite" },
-  "skip_tasks": ["\\S4U\\TaskS4U"]
+  "skip_tasks": ["\\S4U\\TaskS4U"],
+  "action_overrides": {
+    "\\Ancien\\Planif": {
+      "command": "D:\\Scripts\\job.exe",
+      "workingDirectory": "D:\\Scripts"
+    }
+  }
 }
 ```
+
+Seuls les champs d'`action_overrides` présents sont réécrits (clés en
+`camelCase`) : `command` = *Programme/script*, `arguments` = *Ajouter des
+arguments*, `workingDirectory` = *Commencer dans*. Une valeur `""` vide le
+champ ; la première action `Exec` de la tâche est concernée.
 
 ```bat
 C:\tsbak\tsbak.exe import D:\tsbak\export-2026-09-10 --answer-file reponses.json --yes

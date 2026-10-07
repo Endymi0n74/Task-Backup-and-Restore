@@ -110,6 +110,25 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
   zip `bfe47186…` ; les deux étapes de la CI sont vertes. Premier run en échec :
   test `nom_archive_invalide_ne_cree_rien` faussé par l'export concurrent d'un
   autre test (cf. leçon ci-dessous) — corrigé par un verrou partagé (`a3fc189`).
+- **2026-10-07 (édition des actions avant import)** — Nouvelle fonctionnalité : permettre de
+  changer individuellement, avant restauration, les champs d'action d'une tâche
+  (*Programme/script*, *Ajouter des arguments*, *Commencer dans*) car les chemins diffèrent
+  d'une machine à l'autre. Moteur `tsbak/src/action.rs` : `read_action` (lecture des valeurs
+  en vigueur + nombre d'actions pour pré-remplir l'interface) et `apply_action` (réécriture de
+  la première action `Exec`, éléments manquants créés dans l'ordre du schema, échappement XML
+  conservé, reste du document intact ; erreur claire si aucune action `Exec`). Appliqué dans
+  `build_plan` **après** le saut explicite et **avant** la comparaison d'existant : une tâche
+  dont on change le programme passe d'« Identique » à « Mettre à jour ». Transport par
+  `AnswerFile.action_overrides` → décisions GUI (`ImportDecisions`), answer-file CLI et
+  fichier de réponses du helper élevé partagent la même structure. Interface : bouton
+  « Modifier l'action… » dans la colonne *Résolution* (formulaire inline à trois champs,
+  badge *Action modifiée*, « Rétablir l'action d'origine », avertissement multi-actions,
+  bouton sans objet si aucune action `Exec`). Docs : guide **4.2** + ligne de dépannage +
+  note answer-file (section 8), README FR/EN, MIGRATION.md, `tsbak/README.md` — PDF
+  régénéré via `tools/guide-pdf.ps1 -Action Build`. Tests : 16 unitaires dans `action.rs`
+  (indentation, insertion ordonnée, échappement, multi-Exec, préfixe XML, auto-fermant,
+  sérialisation), 4 dans `import.rs` (écriture, reclassification, identité, erreur) et 2
+  côté `src-tauri` (roundtrip answer-file, import élevé).
 
 ## Décisions structurantes
 
@@ -145,6 +164,18 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
    régénère et commite les PDF sur la branche par défaut mais échoue en pull request si le PDF
    commité est périmé. `-Action Update` déclare les sources couvertes **sans** régénérer, pour
    un PDF livré retouché à la main.
+9. **Édition des actions avant import** : les champs d'action d'une tâche — *Programme/script*
+   (`<Command>`), *Ajouter des arguments* (`<Arguments>`), *Commencer dans*
+   (`<WorkingDirectory>`) — se modifient tâche par tâche **dans le plan**, avant restauration,
+   pour re-cibler les chemins propres à la machine source (lettres de lecteur, partages UNC).
+   La réécriture vit dans `tsbak/src/action.rs` (parcours d'événements quick-xml, **première**
+   action `Exec` uniquement, éléments absents créés dans l'ordre du schema, reste du document
+   recopié octet à octet) et n'est appliquée qu'**une seule fois**, dans `build_plan` avant
+   toute comparaison : classification, dry-run, import réel et helper élevé voient donc le
+   même XML modifié, et l'archive d'origine n'est jamais réécrite. Le transport est unique :
+   `action_overrides` (clés camelCase, champs optionnels) porte la même structure dans les
+   décisions de l'interface, le fichier de réponses CLI et le fichier de réponses de
+   l'élévation.
 
 ## Leçons apprises
 
@@ -209,3 +240,7 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
 - [ ] Vérifier la fermeture sur un **vrai** Windows Server 2016/2019 : non reproductible sur
       Win11 (le binaire 1.1.0 y fermait déjà proprement) ; le correctif est déterministe par
       construction (`process::exit` avant toute déconnexion).
+- [x] **Édition des actions avant import** (2026-10-07) : `tsbak/src/action.rs`
+      (`read_action`/`apply_action`, première action `Exec`), surcharges transportées par
+      `action_overrides` (décisions GUI → answer-file CLI → helper élevé), bouton
+      « Modifier l'action… » dans le plan de l'interface, guide 4.2 + README/MIGRATION.

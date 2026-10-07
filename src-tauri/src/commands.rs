@@ -18,6 +18,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use tsbak::action::{self, ActionOverride};
 use tsbak::answers::{AnswerFile, ConflictDecision};
 use tsbak::export::{export, PatternFilter};
 use tsbak::import::{build_plan, execute_plan, load_and_verify, ImportOptions, PlanItem};
@@ -100,6 +101,15 @@ pub struct PlanItemView {
     pub source_user: Option<String>,
     /// Un mot de passe sera requis pour cette tâche lors de l'écriture.
     pub needs_password: bool,
+    /// Programme/script de la première action (après surcharge éventuelle),
+    /// `None` si la tâche n'a pas d'action `Exec`.
+    pub action_command: Option<String>,
+    /// Arguments de la première action, `None` si absents.
+    pub action_arguments: Option<String>,
+    /// Dossier de démarrage de la première action, `None` si absent.
+    pub action_working_directory: Option<String>,
+    /// Nombre d'actions `Exec` de la tâche (`0` : non modifiable).
+    pub action_count: usize,
 }
 
 /// Décisions de l'utilisateur pour l'import (conflits, mappings, sauts).
@@ -116,6 +126,11 @@ pub struct ImportDecisions {
     /// Tâches à sauter explicitement.
     #[serde(default)]
     pub skip_tasks: Vec<String>,
+    /// Surcharges d'action par chemin de tâche : seuls les champs fournis
+    /// de la première action `Exec` (programme, arguments, dossier de
+    /// démarrage) sont réécrits avant l'écriture.
+    #[serde(default)]
+    pub action_overrides: HashMap<String, ActionOverride>,
 }
 
 /// Rapport d'exécution d'un import (ou d'une simulation). Sérialisable dans
@@ -165,6 +180,10 @@ fn plan_item_view(item: &PlanItem) -> PlanItemView {
         ImportAction::PasswordRequired { user } => ("password_required", Some(user.clone()), None, true),
         ImportAction::UserUnmapped { source_user } => ("user_unmapped", None, Some(source_user.clone()), false),
     };
+    // Action éditable de la tâche (première action `Exec`) : lecture
+    // best-effort — une tâche sans action exécutable renvoie `None`/0 et
+    // l'interface masque alors le bouton d'édition.
+    let info = action::read_action(&item.xml, &item.record.path).unwrap_or_default();
     PlanItemView {
         path: item.record.path.clone(),
         target_path: item.target_path.clone(),
@@ -173,6 +192,10 @@ fn plan_item_view(item: &PlanItem) -> PlanItemView {
         target_user,
         source_user,
         needs_password,
+        action_command: info.command,
+        action_arguments: info.arguments,
+        action_working_directory: info.working_directory,
+        action_count: info.exec_count,
     }
 }
 
@@ -798,6 +821,7 @@ pub(crate) fn build_answers(decisions: Option<&ImportDecisions>) -> AnswerFile {
     if let Some(d) = decisions {
         answers.user_map = d.user_map.clone();
         answers.skip_tasks = d.skip_tasks.clone();
+        answers.action_overrides = d.action_overrides.clone();
         for (path, decision) in &d.conflicts {
             let policy = match decision.as_str() {
                 "overwrite" => ConflictDecision::Overwrite,
