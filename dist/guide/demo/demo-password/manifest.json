@@ -1,0 +1,21 @@
+{
+    "exported_at":  "2026-10-07T09:15:00+02:00",
+    "source_host":  "KEYRA-PC",
+    "tasks":  [
+                  {
+                      "xml_file":  "Backup__Nightly.xml",
+                      "path":  "\\Backup\\Nightly",
+                      "sha256":  "c43f6b7c27adcf8c8a91b32f9e47e7c910ead86a97b0569e0dd0d9585899ac6e",
+                      "logon_type":  "Password",
+                      "user_id":  "KEYRA-PC\\svc_backup"
+                  },
+                  {
+                      "xml_file":  "Maintenance__Nettoyage.xml",
+                      "path":  "\\Maintenance\\Nettoyage",
+                      "sha256":  "e547982aae84d3c40c00bf029bd8f48606406bf063a02871841a43008a3b34c3",
+                      "logon_type":  "Password",
+                      "user_id":  "KEYRA-PC\\svc_sql"
+                  }
+              ],
+    "version":  1
+}

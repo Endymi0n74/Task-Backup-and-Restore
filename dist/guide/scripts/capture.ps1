@@ -43,6 +43,10 @@ public class Cap {
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int cx, int cy, uint f);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RC r);
+  // Cadre VISIBLE de la fenetre (sans les bordures invisibles DWM de
+  // Windows 11, qui laissent transparaitre la fenetre derriere dans la
+  // capture) ; repli sur GetWindowRect si dwmapi est absent.
+  [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr h, int attr, out RC r, int size);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
@@ -136,7 +140,12 @@ $sbTitle = New-Object System.Text.StringBuilder 512
 Write-Output ("titre fenetre : '" + $sbTitle.ToString() + "'")
 
 $r = New-Object Cap+RC
-if (-not [Cap]::GetWindowRect($h, [ref]$r)) { throw "GetWindowRect a echoue" }
+$hr = [Cap]::DwmGetWindowAttribute($h, 9, [ref]$r, 16)
+if ($hr -ne 0) { [Cap]::GetWindowRect($h, [ref]$r) | Out-Null }
+# Marge interne : malgre les bornes DWM, les tout derniers pixels de la
+# bordure de redimensionnement laissent transparaitre la fenetre derriere
+# (bordures invisibles Windows 11). 6 px suffisent et se voient a peine.
+$r.L = $r.L + 6; $r.R = $r.R - 6; $r.B = $r.B - 6
 $wd = $r.R - $r.L
 $ht = $r.B - $r.T
 if ($wd -lt 200 -or $ht -lt 150) { throw ("rect suspect : {0}x{1}" -f $wd, $ht) }
