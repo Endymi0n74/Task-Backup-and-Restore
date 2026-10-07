@@ -59,18 +59,26 @@ guidée sur les anciens serveurs.
 
 ## 📖 Guide d'utilisation (PDF)
 
-Le guide illustré complet est inclus : **[`dist/Guide-tsbak.pdf`](dist/Guide-tsbak.pdf)**
+Le guide illustré complet — 10 sections, 11 captures annotées, établi pour la **v1.1.1** — est
+inclus : **[`dist/Guide-tsbak.pdf`](dist/Guide-tsbak.pdf)**
 
-- export / import avec l'interface graphique, captures annotées pas à pas ;
-- export / import en ligne de commande ;
-- le **mot de passe unique** d'import (section 4.1) : un seul secret appliqué à toutes les tâches
-  « Mot de passe requis » ;
-- les assistants `.cmd` pour les serveurs 2008 R2 / 2012 ;
-- options avancées (`--folder`, `--user-map`, `--password-file`, import non interactif) ;
-- sécurité, bonnes pratiques et dépannage.
+- vue d'ensemble : interface et ligne de commande, un même moteur (section 1) ;
+- export avec l'interface graphique, captures annotées pas à pas (section 2) ;
+- fonctionnement des filtres *Inclure / Exclure* et combinaison avec les cases à cocher (section 3) ;
+- import avec l'interface graphique (section 4), dont le **mot de passe unique** (4.1) : un seul
+  secret appliqué à toutes les tâches « Mot de passe requis » ;
+- onglet *Logs* : le journal du jour en temps réel (section 5) ;
+- ligne de commande : `list` / `export` / `validate` / `import` (section 6) ;
+- assistants `.cmd` pour les serveurs 2008 R2 / 2012 (section 7) ;
+- options avancées : `--folder`, `--user-map`, `--password-file`, `--conflict-policy`,
+  import non interactif (section 8) ;
+- sécurité, bonnes pratiques et dépannage rapide (sections 9 et 10).
 
-Ses sources sont dans [`dist/guide/`](dist/guide/) (HTML + captures + scripts de capture). Un **mémo d'une page** sur les
-filtres d'inclusion/exclusion est aussi disponible : [`dist/Memo-motifs.pdf`](dist/Memo-motifs.pdf) (source : `dist/guide/memo-motifs.html`).
+Ses sources sont dans [`dist/guide/`](dist/guide/) (HTML + captures + scripts). Les captures se
+refont en une commande (`take-gui-shots.ps1` pour l'interface, `take-console-shots.ps1` pour la
+console), se contrôlent par OCR (`ocr.ps1`) et les pastilles se recomposent en image pour la
+vérification (`figcheck.ps1`). Un **mémo d'une page** sur les filtres d'inclusion/exclusion est
+aussi disponible : [`dist/Memo-motifs.pdf`](dist/Memo-motifs.pdf) (source : `dist/guide/memo-motifs.html`).
 
 Les PDF sont **régénérés automatiquement** dès qu'une source de `dist/guide/` change
 (workflow GitHub Actions [`guide-pdf.yml`](.github/workflows/guide-pdf.yml)) : sur la branche par défaut
@@ -227,9 +235,9 @@ cargo test e2e_export_zip_aes_then_reimport -- --ignored --nocapture
 | `tsbak/` | Crate Rust du moteur + CLI `tsbak.exe` (`scheduler/`, `export.rs`, `import.rs`, `password.rs`, `answers.rs`, `wizard.rs`) |
 | `src-tauri/` | Application Tauri 2 : commandes (`commands.rs`), archives ZIP/AES (`archive.rs`), helper d'élévation (`helper.rs`), logs (`app_log.rs`) |
 | `ui/` | Frontend statique HTML/CSS/JS (sans framework) ; palettes dans `ui/themes/` (`legacy` = publié, `hestia` = variante locale) |
-| `dist/` | Livraison : `TaskBackupRestore.exe`, `tsbak.exe`, assistants `.cmd`, `Guide-tsbak.pdf` + sources du guide |
+| `dist/` | Livraison : `TaskBackupRestore.exe`, `tsbak.exe`, assistants `.cmd`, `Guide-tsbak.pdf` + `Memo-motifs.pdf` + sources du guide (`guide/`, captures et scripts) |
 | `tools/` | Scripts de maintenance : générateur d'icône (`make_icon.py`), assemblage des artefacts de release (`make-release.ps1`), thème de l'interface (`select-theme.ps1`), fraîcheur et régénération du guide PDF (`guide-pdf.ps1`) |
-| `.github/workflows/` | Intégration continue : `guide-pdf.yml` (guide PDF régénéré et contrôlé) |
+| `.github/workflows/` | Intégration continue : `ci.yml` (tests des deux crates à chaque *push*), `guide-pdf.yml` (guide PDF régénéré et contrôlé) |
 
 ## Licence
 

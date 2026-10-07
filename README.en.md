@@ -59,17 +59,25 @@ experience on older servers.
 
 ## 📖 User guide (PDF)
 
-The complete illustrated guide is included: **[`dist/Guide-tsbak.pdf`](dist/Guide-tsbak.pdf)**
+The complete illustrated guide — 10 sections, 11 annotated screenshots, written for **v1.1.1** —
+is included: **[`dist/Guide-tsbak.pdf`](dist/Guide-tsbak.pdf)**
 
-- export / import with the graphical interface, annotated step-by-step screenshots ;
-- export / import from the command line ;
-- the import **single password** (section 4.1): one secret applied to all tasks
-  "Password required" ;
-- the `.cmd` helpers for 2008 R2 / 2012 servers ;
-- advanced options (`--folder`, `--user-map`, `--password-file`, non-interactive import) ;
-- security, best practices and troubleshooting.
+- overview: interface and command line, one engine (section 1) ;
+- export with the graphical interface, annotated step-by-step screenshots (section 2) ;
+- how the *Inclure / Exclure* filters work and combine with the checkboxes (section 3) ;
+- import with the graphical interface (section 4), including the **single password** (4.1):
+  one secret applied to all "Password required" tasks ;
+- *Logs* tab: the day's journal live (section 5) ;
+- command line: `list` / `export` / `validate` / `import` (section 6) ;
+- `.cmd` helpers for 2008 R2 / 2012 servers (section 7) ;
+- advanced options: `--folder`, `--user-map`, `--password-file`, `--conflict-policy`,
+  non-interactive import (section 8) ;
+- security, best practices and quick troubleshooting (sections 9 and 10).
 
-Its sources are in [`dist/guide/`](dist/guide/) (HTML + screenshots + capture scripts). A **one-page cheat sheet** on the
+Its sources are in [`dist/guide/`](dist/guide/) (HTML + screenshots + scripts). Screenshots are
+regenerated in one command (`take-gui-shots.ps1` for the interface, `take-console-shots.ps1`
+for the console), checked by OCR (`ocr.ps1`) and the numbered badges recomposed over the image
+for verification (`figcheck.ps1`). A **one-page cheat sheet** on the
 inclusion/exclusion filters is also available: [`dist/Memo-motifs.pdf`](dist/Memo-motifs.pdf) (source: `dist/guide/memo-motifs.html`).
 
 The PDFs are **regenerated automatically** as soon as a source in `dist/guide/` changes
@@ -78,13 +86,13 @@ the PDF is rebuilt and committed, and a *pull request* that modifies the sources
 regenerating the PDFs fails the check. Locally, `tools/guide-pdf.ps1` does the same:
 
 ```bash
-# Contrôler la fraîcheur des PDF livrés (code 4 si périmés avec -ErrorOnStale)
+# Check the freshness of the delivered PDFs (exit 4 if stale with -ErrorOnStale)
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Check
 
-# Régénérer les PDF puis enregistrer l'empreinte de leurs sources
+# Regenerate the PDFs then record the fingerprint of their sources
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Build
 
-# Déclarer les sources actuelles couvertes SANS régénérer (PDF retouché à la main)
+# Declare the current sources covered WITHOUT regenerating (PDF edited by hand)
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\guide-pdf.ps1 -Action Update
 ```
 
@@ -112,37 +120,37 @@ powershell -NoProfile -ExecutionPolicy Bypass -File dist/guide/scripts/make-pdf.
 ### Command line (Server 2008 R2 → 2025+)
 
 ```bat
-:: 1. Exporter toutes les tâches vers un dossier
+:: 1. Export all tasks to a folder
 tsbak.exe export C:\tsbak\export-2026-01-01
 
-::    ... ou sans les tâches système \Microsoft\
+::    ... or without the \Microsoft\ system tasks
 tsbak.exe export C:\tsbak\export-2026-01-01 --hide-microsoft
 
-:: 2. Vérifier l'intégrité (manifeste + empreintes SHA-256)
+:: 2. Verify integrity (manifest + SHA-256 fingerprints)
 tsbak.exe validate C:\tsbak\export-2026-01-01
 
-:: 3. Simuler (rien n'est écrit)
+:: 3. Simulate (nothing is written)
 tsbak.exe import C:\tsbak\export-2026-01-01 --dry-run
 
-:: 4. Importer réellement (en administrateur)
+:: 4. Really import (as administrator)
 tsbak.exe import C:\tsbak\export-2026-01-01
-::    Options utiles :
-::    --folder \Restauration-2026        restaure sous ce dossier, structure préservée
-::    --password-file mdp.txt            mots de passe (DOMAINE\user=motdepasse, 1/ligne)
-::    --user-map OLDPC\user:NEWPC\user   remplace un compte source par un compte cible
-::    --skip-password-tasks              ignore (sans bloquer) les tâches sans mot de passe
-::    --answer-file reponses.json        import 100 % non interactif
+::    Useful options:
+::    --folder \Restauration-2026        restore under this folder, structure preserved
+::    --password-file mdp.txt            passwords (DOMAIN\user=password, 1 per line)
+::    --user-map OLDPC\user:NEWPC\user   replace a source account with a target account
+::    --skip-password-tasks              skip (without blocking) tasks without a password
+::    --answer-file reponses.json        100 % non-interactive import
 ```
 
 ## Build
 
 ```bash
-# CLI (produit dist/tsbak.exe équivalent)
+# CLI (produces the equivalent dist/tsbak.exe)
 cd tsbak
 cargo build --release
 cargo test
 
-# Interface graphique (produit l'exe, sans bundle)
+# Graphical interface (produces the exe, without bundling)
 cd ../src-tauri
 cargo build --release
 cargo test
@@ -164,13 +172,13 @@ palettes live in `ui/themes/` and `ui/index.html` activates only one of them:
 | [`ui/themes/hestia.css`](ui/themes/hestia.css) | local variant (navy blue / orange), not published |
 
 ```powershell
-# Variante locale dans l'interface (puis recompiler pour l'embarquer)
+# Local variant in the interface (then rebuild to embed it)
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\select-theme.ps1 -Action Set -Theme hestia
 
-# Thème actif
+# Active theme
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\select-theme.ps1 -Action Status
 
-# Retour au thème publié avant toute compilation ou publication
+# Back to the published theme before any build or release
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\select-theme.ps1 -Action Set -Theme legacy
 ```
 
@@ -226,9 +234,9 @@ cargo test e2e_export_zip_aes_then_reimport -- --ignored --nocapture
 | `tsbak/` | Rust crate of the engine + `tsbak.exe` CLI (`scheduler/`, `export.rs`, `import.rs`, `password.rs`, `answers.rs`, `wizard.rs`) |
 | `src-tauri/` | Tauri 2 application: commands (`commands.rs`), ZIP/AES archives (`archive.rs`), elevation helper (`helper.rs`), logs (`app_log.rs`) |
 | `ui/` | static HTML/CSS/JS frontend (no framework) ; palettes in `ui/themes/` (`legacy` = published, `hestia` = local variant) |
-| `dist/` | Delivery: `TaskBackupRestore.exe`, `tsbak.exe`, `.cmd` helpers, `Guide-tsbak.pdf` + guide sources |
+| `dist/` | Delivery: `TaskBackupRestore.exe`, `tsbak.exe`, `.cmd` helpers, `Guide-tsbak.pdf` + `Memo-motifs.pdf` + guide sources (`guide/`, screenshots and scripts) |
 | `tools/` | Maintenance scripts: icon generator (`make_icon.py`), release artifact assembly (`make-release.ps1`), interface theme (`select-theme.ps1`), PDF guide freshness and regeneration (`guide-pdf.ps1`) |
-| `.github/workflows/` | Continuous integration: `guide-pdf.yml` (PDF guide regenerated and checked) |
+| `.github/workflows/` | Continuous integration: `ci.yml` (tests of both crates on every *push*), `guide-pdf.yml` (PDF guide regenerated and checked) |
 
 ## License
 
