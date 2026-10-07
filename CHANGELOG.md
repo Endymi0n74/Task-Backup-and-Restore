@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.1.2 — 2026-10-07
+
+### Import — édition des actions
+
+- **Édition des actions avant restauration** : le *Programme/script*, les *arguments* et
+  le *dossier de démarrage* d'une tâche se modifient individuellement **dans le plan
+  d'import**, avant toute écriture — pour re-cibler les chemins propres à la machine
+  source (lettres de lecteur, partages UNC). Dans l'interface : bouton
+  **« Modifier l'action… »** dans la colonne *Résolution* (formulaire aux trois champs,
+  badge *Action modifiée*, « Rétablir l'action d'origine », avertissement quand la tâche
+  compte plusieurs actions, désactivation s'il n'y a aucune action exécutable). En ligne
+  de commande : champ `action_overrides` du fichier de réponses (mêmes clés camelCase
+  pour l'interface, le CLI et le processus élevé).
+- La réécriture vit dans le moteur (nouveau module `tsbak/src/action.rs`) et n'est
+  appliquée qu'**une seule fois**, à la construction du plan : la simulation (dry-run),
+  l'import réel et le processus élevé voient donc exactement le même XML, et
+  **l'archive d'origine n'est jamais modifiée**. Seule la **première** action `Exec`
+  d'une tâche est concernée ; les éléments manquants sont créés dans l'ordre du schéma,
+  les autres champs restent strictement inchangés (un surcharge vide laisse le XML
+  identique au détail près).
+- Une tâche sans action `Exec` fait échouer le plan avec un message explicite, et une
+  tâche dont on modifie le programme est reclassée « Mettre à jour » plutôt que
+  « Identique ». Guide (section 4.2 + dépannage), README FR/EN, MIGRATION.md et
+  `tsbak/README.md` mis à jour.
+
 ## 1.1.1 — 2026-10-06
 
 ### Fermeture

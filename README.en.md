@@ -61,7 +61,7 @@ experience on older servers.
 
 ## 📖 User guide (PDF)
 
-The complete illustrated guide — 10 sections, 11 annotated screenshots, written for **v1.1.1** —
+The complete illustrated guide — 10 sections, 11 annotated screenshots, written for **v1.1.2** —
 is included: **[`dist/Guide-tsbak.pdf`](dist/Guide-tsbak.pdf)**
 
 - overview: interface and command line, one engine (section 1) ;

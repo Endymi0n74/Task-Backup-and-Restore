@@ -61,7 +61,7 @@ guidée sur les anciens serveurs.
 
 ## 📖 Guide d'utilisation (PDF)
 
-Le guide illustré complet — 10 sections, 11 captures annotées, établi pour la **v1.1.1** — est
+Le guide illustré complet — 10 sections, 11 captures annotées, établi pour la **v1.1.2** — est
 inclus : **[`dist/Guide-tsbak.pdf`](dist/Guide-tsbak.pdf)**
 
 - vue d'ensemble : interface et ligne de commande, un même moteur (section 1) ;
