@@ -5,6 +5,11 @@ en complément de [`README.md`](README.md) et [`AGENTS.md`](AGENTS.md).
 
 ## En bref
 
+- **Statut** : ⏸ **Clos le 2026-10-09** — travail suspendu pour l'instant, dernier état
+  livré : **1.1.2**, dépôt propre sur `master`. Sujet **sans rapport** avec
+  `SteamAchievementManager` (SAM, `D:\Codex\SteamAchievementManager`, clos lui aussi le
+  même jour) ni avec l'outillage **REA** (`D:\Codex\tools\memory.md`) : trois entrées
+  indépendantes, ne pas les mélanger. **Ne pas rouvrir sans demande explicite.**
 - **Quoi** : export/import des tâches planifiées Windows (Task Scheduler) en XML brut.
 - **Chemin** : `D:\Codex\tsbak-gui` (dépôt Git autonome, branche `master`) — publié sur
   GitHub sous **Task Backup and Restore** (`Endymi0n74/Task-Backup-and-Restore`).
